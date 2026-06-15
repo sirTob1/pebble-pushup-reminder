@@ -1,0 +1,40 @@
+{
+  "name": "pebble-pushup-reminder",
+  "author": "Antigravity",
+  "version": "1.0.0",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "Pushups",
+    "uuid": "b91d2938-16e5-472d-88f5-d6023ab945a1",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "basalt",
+      "chalk",
+      "emery"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": [
+      "LANGUAGE",
+      "DAILY_GOAL",
+      "REMINDER_INTERVAL",
+      "ACTIVE_START_HOUR",
+      "ACTIVE_END_HOUR",
+      "ADD_REPS",
+      "SESSION_REPS"
+    ],
+    "resources": {
+      "media": []
+    },
+    "capabilities": [
+      "configurable",
+      "health"
+    ]
+  }
+}
