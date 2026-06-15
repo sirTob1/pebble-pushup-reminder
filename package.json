@@ -25,16 +25,13 @@
       "DAILY_GOAL",
       "REMINDER_INTERVAL",
       "ACTIVE_START_HOUR",
-      "ACTIVE_END_HOUR",
-      "ADD_REPS",
-      "SESSION_REPS"
+      "ACTIVE_END_HOUR"
     ],
     "resources": {
       "media": []
     },
     "capabilities": [
-      "configurable",
-      "health"
+      "configurable"
     ]
   }
 }
