@@ -11,6 +11,10 @@
 #define PERSIST_KEY_DAILY_COUNT       6
 #define PERSIST_KEY_LAST_DATE_YDAY    7
 #define PERSIST_KEY_WAKEUP_ID         8
+#define PERSIST_KEY_HISTORY           9   // blob: DayRecord[14]
+#define PERSIST_KEY_EFFECTIVE_GOAL    10
+#define PERSIST_KEY_DAY_TYPE          11
+#define PERSIST_KEY_CONSEC_TRAIN_DAYS 12
 
 // Default values
 #define DEFAULT_DAILY_GOAL        30
@@ -20,6 +24,35 @@
 
 // Wakeup cookie
 #define WAKEUP_COOKIE_REMINDER 0
+
+// Adaptive goals constants
+#define HISTORY_SIZE            14
+#define MIN_DAILY_GOAL          10
+#define MAX_CONSECUTIVE_TRAIN   3
+#define OVERLOAD_INCREASE_PCT   8   // 8% increase on goal met
+#define DELOAD_DECREASE_PCT     10  // 10% decrease on < 80% achieved
+#define DELOAD_THRESHOLD_PCT    80  // below this % triggers deload
+#define FATIGUE_EXCESS_PCT      150 // >150% of goal triggers rest day
+
+// ============================================================================
+// Adaptive Goals: Day Types & History
+// ============================================================================
+typedef enum {
+  DAY_TYPE_TRAINING_NORMAL  = 0,
+  DAY_TYPE_TRAINING_OVERLOAD = 1,
+  DAY_TYPE_TRAINING_DELOAD   = 2,
+  DAY_TYPE_REST              = 3
+} DayType;
+
+typedef struct __attribute__((packed)) {
+  uint16_t target;     // goal for that day
+  uint16_t achieved;   // actual push-ups done
+  uint8_t  day_type;   // DayType enum
+  uint16_t yday;       // tm_yday (0-365)
+} DayRecord;
+
+static DayRecord s_history[HISTORY_SIZE];
+static uint8_t   s_history_count = 0;  // number of valid entries (0..14)
 
 // ============================================================================
 // Language Support
@@ -48,6 +81,11 @@ static uint16_t s_daily_count = 0;
 static int      s_last_date_yday = -1;
 static WakeupId s_wakeup_id = -1;
 static bool     s_launched_by_wakeup = false;
+
+// Adaptive goals state
+static uint16_t s_effective_daily_goal = DEFAULT_DAILY_GOAL;
+static DayType  s_today_day_type = DAY_TYPE_TRAINING_NORMAL;
+static uint8_t  s_consecutive_train_days = 0;
 
 // ============================================================================
 // UI Windows & Layers
@@ -91,6 +129,7 @@ static void reminder_window_load(Window *window);
 static void reminder_window_unload(Window *window);
 static void schedule_next_wakeup(void);
 static void check_and_reset_daily_count(void);
+static void run_adaptive_algorithm(void);
 
 // ============================================================================
 // Persistent Storage: Load & Save
@@ -120,6 +159,26 @@ static void load_settings(void) {
   if (persist_exists(PERSIST_KEY_WAKEUP_ID)) {
     s_wakeup_id = (WakeupId)persist_read_int(PERSIST_KEY_WAKEUP_ID);
   }
+  if (persist_exists(PERSIST_KEY_EFFECTIVE_GOAL)) {
+    s_effective_daily_goal = (uint16_t)persist_read_int(PERSIST_KEY_EFFECTIVE_GOAL);
+  } else {
+    s_effective_daily_goal = s_daily_goal; // Initialize from user baseline
+  }
+  if (persist_exists(PERSIST_KEY_DAY_TYPE)) {
+    s_today_day_type = (DayType)persist_read_int(PERSIST_KEY_DAY_TYPE);
+  }
+  if (persist_exists(PERSIST_KEY_CONSEC_TRAIN_DAYS)) {
+    s_consecutive_train_days = (uint8_t)persist_read_int(PERSIST_KEY_CONSEC_TRAIN_DAYS);
+  }
+  // Load history blob
+  if (persist_exists(PERSIST_KEY_HISTORY)) {
+    int bytes_read = persist_read_data(PERSIST_KEY_HISTORY, s_history, sizeof(s_history));
+    s_history_count = bytes_read / sizeof(DayRecord);
+    if (s_history_count > HISTORY_SIZE) s_history_count = HISTORY_SIZE;
+  } else {
+    s_history_count = 0;
+    memset(s_history, 0, sizeof(s_history));
+  }
 }
 
 static void save_settings(void) {
@@ -131,21 +190,152 @@ static void save_settings(void) {
   persist_write_int(PERSIST_KEY_DAILY_COUNT, s_daily_count);
   persist_write_int(PERSIST_KEY_LAST_DATE_YDAY, s_last_date_yday);
   persist_write_int(PERSIST_KEY_WAKEUP_ID, s_wakeup_id);
+  persist_write_int(PERSIST_KEY_EFFECTIVE_GOAL, s_effective_daily_goal);
+  persist_write_int(PERSIST_KEY_DAY_TYPE, s_today_day_type);
+  persist_write_int(PERSIST_KEY_CONSEC_TRAIN_DAYS, s_consecutive_train_days);
+  // Save history blob
+  persist_write_data(PERSIST_KEY_HISTORY, s_history, s_history_count * sizeof(DayRecord));
 }
 
 // ============================================================================
-// Daily Count Management
+// Daily Count Management & Adaptive Algorithm
 // ============================================================================
+static void archive_day_to_history(uint16_t target, uint16_t achieved, DayType type, uint16_t yday) {
+  // Shift history if full (FIFO: oldest entry at index 0)
+  if (s_history_count >= HISTORY_SIZE) {
+    memmove(&s_history[0], &s_history[1], (HISTORY_SIZE - 1) * sizeof(DayRecord));
+    s_history_count = HISTORY_SIZE - 1;
+  }
+  // Append new record
+  DayRecord *rec = &s_history[s_history_count];
+  rec->target = target;
+  rec->achieved = achieved;
+  rec->day_type = (uint8_t)type;
+  rec->yday = yday;
+  s_history_count++;
+}
+
+static void run_adaptive_algorithm(void) {
+  // Determine today's goal and day type based on yesterday's performance.
+  // Called when a new day is detected.
+
+  // If no history yet, use user-set baseline
+  if (s_history_count == 0) {
+    s_effective_daily_goal = s_daily_goal;
+    s_today_day_type = DAY_TYPE_TRAINING_NORMAL;
+    s_consecutive_train_days = 0;
+    return;
+  }
+
+  // Get yesterday's record (most recent in history)
+  DayRecord *yesterday = &s_history[s_history_count - 1];
+
+  // --- Rule B: Immediate rest day if yesterday had >150% of goal ---
+  if (yesterday->day_type != DAY_TYPE_REST && yesterday->target > 0) {
+    uint32_t fatigue_threshold = (uint32_t)yesterday->target * FATIGUE_EXCESS_PCT / 100;
+    if (yesterday->achieved > fatigue_threshold) {
+      s_today_day_type = DAY_TYPE_REST;
+      s_effective_daily_goal = 0;
+      s_consecutive_train_days = 0;
+      APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: REST DAY (fatigue - yesterday %d/%d)",
+              yesterday->achieved, yesterday->target);
+      return;
+    }
+  }
+
+  // --- Rule A: Rest day after MAX_CONSECUTIVE_TRAIN consecutive training days ---
+  if (s_consecutive_train_days >= MAX_CONSECUTIVE_TRAIN) {
+    s_today_day_type = DAY_TYPE_REST;
+    s_effective_daily_goal = 0;
+    s_consecutive_train_days = 0;
+    APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: REST DAY (scheduled recovery after %d days)",
+            MAX_CONSECUTIVE_TRAIN);
+    return;
+  }
+
+  // --- Training Day: Calculate new goal ---
+  // If yesterday was a rest day, carry forward the last training target
+  uint16_t base_goal = s_effective_daily_goal;
+  if (yesterday->day_type == DAY_TYPE_REST) {
+    // Find last training day's target from history
+    for (int i = s_history_count - 1; i >= 0; i--) {
+      if (s_history[i].day_type != DAY_TYPE_REST && s_history[i].target > 0) {
+        base_goal = s_history[i].target;
+        break;
+      }
+    }
+    s_today_day_type = DAY_TYPE_TRAINING_NORMAL;
+    s_effective_daily_goal = base_goal;
+    s_consecutive_train_days++;
+    APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: TRAINING NORMAL (post-rest), goal=%d",
+            s_effective_daily_goal);
+    return;
+  }
+
+  // Yesterday was a training day - evaluate performance
+  if (yesterday->target > 0) {
+    uint32_t pct = (uint32_t)yesterday->achieved * 100 / yesterday->target;
+
+    if (pct >= 100) {
+      // Goal met or exceeded: Progressive Overload
+      uint16_t increase = (base_goal * OVERLOAD_INCREASE_PCT) / 100;
+      if (increase < 1) increase = 1;
+      s_effective_daily_goal = base_goal + increase;
+      s_today_day_type = DAY_TYPE_TRAINING_OVERLOAD;
+      APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: OVERLOAD %d -> %d (%d%% achieved)",
+              base_goal, s_effective_daily_goal, (int)pct);
+    } else if (pct < DELOAD_THRESHOLD_PCT) {
+      // Below 80%: Deload
+      uint16_t decrease = (base_goal * DELOAD_DECREASE_PCT) / 100;
+      if (decrease < 1) decrease = 1;
+      s_effective_daily_goal = base_goal > decrease ? base_goal - decrease : MIN_DAILY_GOAL;
+      if (s_effective_daily_goal < MIN_DAILY_GOAL) s_effective_daily_goal = MIN_DAILY_GOAL;
+      s_today_day_type = DAY_TYPE_TRAINING_DELOAD;
+      APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: DELOAD %d -> %d (%d%% achieved)",
+              base_goal, s_effective_daily_goal, (int)pct);
+    } else {
+      // Between 80-99%: Keep same goal
+      s_effective_daily_goal = base_goal;
+      s_today_day_type = DAY_TYPE_TRAINING_NORMAL;
+      APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: NORMAL (keep %d, %d%% achieved)",
+              s_effective_daily_goal, (int)pct);
+    }
+  } else {
+    s_effective_daily_goal = s_daily_goal;
+    s_today_day_type = DAY_TYPE_TRAINING_NORMAL;
+  }
+
+  // Enforce minimum
+  if (s_effective_daily_goal < MIN_DAILY_GOAL) {
+    s_effective_daily_goal = MIN_DAILY_GOAL;
+  }
+
+  s_consecutive_train_days++;
+}
+
 static void check_and_reset_daily_count(void) {
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
   int today_yday = t->tm_yday;
 
   if (s_last_date_yday != today_yday) {
+    // Archive yesterday's data to history (if there was a previous day)
+    if (s_last_date_yday >= 0) {
+      archive_day_to_history(
+        s_effective_daily_goal,
+        s_daily_count,
+        s_today_day_type,
+        (uint16_t)s_last_date_yday
+      );
+    }
+
+    // Reset daily count and run adaptive algorithm
     s_daily_count = 0;
     s_last_date_yday = today_yday;
+    run_adaptive_algorithm();
     save_settings();
-    APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: New day detected, daily count reset to 0.");
+    APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: New day. Effective goal=%d, type=%d, streak=%d",
+            s_effective_daily_goal, s_today_day_type, s_consecutive_train_days);
   }
 }
 
@@ -159,11 +349,16 @@ static void schedule_next_wakeup(void) {
     s_wakeup_id = -1;
   }
 
-  // Don't schedule if daily goal already met
+  // Don't schedule if rest day or daily goal already met
   check_and_reset_daily_count();
-  if (s_daily_count >= s_daily_goal) {
+  if (s_today_day_type == DAY_TYPE_REST) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: Rest day, no wakeup scheduled.");
+    save_settings();
+    return;
+  }
+  if (s_daily_count >= s_effective_daily_goal) {
     APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: Daily goal met (%d/%d), no wakeup scheduled.",
-            s_daily_count, s_daily_goal);
+            s_daily_count, s_effective_daily_goal);
     save_settings();
     return;
   }
@@ -236,7 +431,7 @@ static void reminder_layer_update_proc(Layer *layer, GContext *ctx) {
 
   // Progress display
   static char progress_buf[32];
-  snprintf(progress_buf, sizeof(progress_buf), "%d / %d", s_daily_count, s_daily_goal);
+  snprintf(progress_buf, sizeof(progress_buf), "%d / %d", s_daily_count, s_effective_daily_goal);
 
   graphics_context_set_text_color(ctx, GColorBlack);
   graphics_draw_text(ctx, progress_buf,
@@ -319,7 +514,12 @@ static void show_reminder(void) {
 static void wakeup_handler(WakeupId id, int32_t reason) {
   if (reason == WAKEUP_COOKIE_REMINDER) {
     check_and_reset_daily_count();
-    if (s_daily_count < s_daily_goal) {
+    // Don't remind on rest days or when goal is met
+    if (s_today_day_type == DAY_TYPE_REST) {
+      schedule_next_wakeup();
+      return;
+    }
+    if (s_daily_count < s_effective_daily_goal) {
       show_reminder();
     } else {
       // Goal met, don't remind
@@ -530,9 +730,11 @@ static void settings_menu_draw_row(GContext *ctx, const Layer *cell_layer,
 
   switch (cell_index->row) {
     case 0:
-      snprintf(subtitle_buf, sizeof(subtitle_buf), "%d Pushups", s_daily_goal);
+      snprintf(subtitle_buf, sizeof(subtitle_buf),
+               translate("%d (Adaptiv: %d)", "%d (Adaptive: %d)"),
+               s_daily_goal, s_effective_daily_goal);
       menu_cell_basic_draw(ctx, cell_layer,
-                           translate("Tagesziel", "Daily Goal"),
+                           translate("Basisziel", "Baseline Goal"),
                            subtitle_buf, NULL);
       break;
     case 1:
@@ -613,16 +815,40 @@ static uint16_t main_menu_get_num_rows(MenuLayer *menu_layer,
 
 static void main_menu_draw_row(GContext *ctx, const Layer *cell_layer,
                                 MenuIndex *cell_index, void *data) {
+  static char status_buf[48];
   switch (cell_index->row) {
-    case 0:
+    case 0: {
+      // Show today's status with adaptive info
+      const char *status = "";
+      switch (s_today_day_type) {
+        case DAY_TYPE_TRAINING_OVERLOAD:
+          status = translate("Training: Steigerung", "Training: Overload");
+          break;
+        case DAY_TYPE_TRAINING_DELOAD:
+          status = translate("Training: Erholung", "Training: Deload");
+          break;
+        case DAY_TYPE_TRAINING_NORMAL:
+          status = translate("Training: Normal", "Training: Normal");
+          break;
+        case DAY_TYPE_REST:
+          status = translate("Ruhetag: Regeneration", "Rest Day: Recovery");
+          break;
+      }
+      if (s_today_day_type == DAY_TYPE_REST) {
+        snprintf(status_buf, sizeof(status_buf), "%s", status);
+      } else {
+        snprintf(status_buf, sizeof(status_buf), "%d/%d - %s",
+                 s_daily_count, s_effective_daily_goal, status);
+      }
       menu_cell_basic_draw(ctx, cell_layer,
                            translate("Session starten", "Start Session"),
-                           translate("Pushups tracken", "Track push-ups"), NULL);
+                           status_buf, NULL);
       break;
+    }
     case 1:
       menu_cell_basic_draw(ctx, cell_layer,
                            translate("Schnell eintragen", "Quick Log"),
-                           translate("Manuell hinzufügen", "Add manually"), NULL);
+                           translate("Manuell hinzuf\xC3\xBCgen", "Add manually"), NULL);
       break;
     case 2:
       menu_cell_basic_draw(ctx, cell_layer,
@@ -773,7 +999,9 @@ static void init(void) {
     int32_t reason = 0;
     wakeup_get_launch_event(&id, &reason);
 
-    if (reason == WAKEUP_COOKIE_REMINDER && s_daily_count < s_daily_goal) {
+    if (reason == WAKEUP_COOKIE_REMINDER
+        && s_today_day_type != DAY_TYPE_REST
+        && s_daily_count < s_effective_daily_goal) {
       // Show reminder directly (main menu will be pushed below but reminder on top)
       s_main_menu_window = window_create();
       window_set_window_handlers(s_main_menu_window, (WindowHandlers) {
