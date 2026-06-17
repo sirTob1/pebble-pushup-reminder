@@ -922,6 +922,7 @@ static void adjust_select_handler(ClickRecognizerRef recognizer, void *context) 
   s_daily_count += s_adjust_count;
   save_settings();
   update_app_glance();
+  schedule_next_wakeup();
 
   vibes_double_pulse();
 
@@ -1286,6 +1287,7 @@ static void quicklog_select_handler(ClickRecognizerRef recognizer, void *context
     s_daily_count += s_quicklog_count;
     save_settings();
     update_app_glance();
+    schedule_next_wakeup();
     vibes_double_pulse();
 
     if (s_main_menu_layer) {
