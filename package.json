@@ -10,6 +10,7 @@
     "pebble-clay": "^1.0.4"
   },
   "pebble": {
+    "versionLabel": "1.1.0",
     "displayName": "Pushups",
     "uuid": "b91d2938-16e5-472d-88f5-d6023ab945a1",
     "sdkVersion": "3",
