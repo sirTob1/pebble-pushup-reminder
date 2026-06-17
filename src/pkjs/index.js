@@ -1,7 +1,7 @@
-// Pebble Pushup Reminder - PebbleKit JS Companion (ES5)
 var Clay = require('pebble-clay');
 var clayConfig = require('./config');
-var clay = new Clay(clayConfig, null, { autoHandleEvents: false });
+var customClay = require('./custom-clay');
+var clay = new Clay(clayConfig, customClay, { autoHandleEvents: false });
 
 // We must manually handle events to support the Gadgetbridge workarounds
 // but Clay still handles the UI generation.
@@ -71,4 +71,19 @@ Pebble.addEventListener("ready", function(e) {
 Pebble.addEventListener("appmessage", function(e) {
   var dict = e.payload;
   console.log("Pushups JS: Received AppMessage: " + JSON.stringify(dict));
+
+  if (dict.LOG_PUSHUPS !== undefined && dict.LOG_TIMESTAMP !== undefined) {
+    var history = [];
+    try {
+      history = JSON.parse(localStorage.getItem("pushup_history") || "[]");
+    } catch (err) {}
+    
+    history.push({
+      count: dict.LOG_PUSHUPS,
+      time: dict.LOG_TIMESTAMP
+    });
+    
+    localStorage.setItem("pushup_history", JSON.stringify(history));
+    console.log("Pushups JS: Saved pushup session to history.");
+  }
 });
