@@ -78,6 +78,19 @@ module.exports = [
     ]
   },
   {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "History Dashboard"
+      },
+      {
+        "type": "text",
+        "defaultValue": "<div id='dashboard-chart' style='margin:10px 0;'>No history available yet.</div><button class='btn' id='btn-export-csv' style='width:100%;'>Export CSV</button>"
+      }
+    ]
+  },
+  {
     "type": "submit",
     "defaultValue": "Save Settings"
   }

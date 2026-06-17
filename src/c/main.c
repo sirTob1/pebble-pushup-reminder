@@ -453,6 +453,19 @@ static void update_app_glance(void) {
 }
 
 // ============================================================================
+// Sync to Phone
+// ============================================================================
+static void send_pushup_log(uint16_t count) {
+  DictionaryIterator *iter;
+  if (app_message_outbox_begin(&iter) == APP_MSG_OK) {
+    dict_write_int(iter, MESSAGE_KEY_LOG_PUSHUPS, &count, sizeof(uint16_t), true);
+    uint32_t timestamp = time(NULL);
+    dict_write_int(iter, MESSAGE_KEY_LOG_TIMESTAMP, &timestamp, sizeof(uint32_t), true);
+    app_message_outbox_send();
+  }
+}
+
+// ============================================================================
 // Wakeup Scheduling
 // ============================================================================
 static void schedule_next_wakeup(void) {
@@ -922,6 +935,7 @@ static void adjust_select_handler(ClickRecognizerRef recognizer, void *context) 
   s_daily_count += s_adjust_count;
   save_settings();
   update_app_glance();
+  send_pushup_log(s_adjust_count);
   schedule_next_wakeup();
 
   vibes_double_pulse();
@@ -1287,6 +1301,7 @@ static void quicklog_select_handler(ClickRecognizerRef recognizer, void *context
     s_daily_count += s_quicklog_count;
     save_settings();
     update_app_glance();
+    send_pushup_log(s_quicklog_count);
     schedule_next_wakeup();
     vibes_double_pulse();
 

@@ -27,7 +27,9 @@
       "DAILY_GOAL",
       "REMINDER_INTERVAL",
       "ACTIVE_START_HOUR",
-      "ACTIVE_END_HOUR"
+      "ACTIVE_END_HOUR",
+      "LOG_PUSHUPS",
+      "LOG_TIMESTAMP"
     ],
     "resources": {
       "media": []
