@@ -108,6 +108,12 @@ static Layer  *s_session_layer  = NULL;
 static Window *s_adjust_window = NULL;
 static Layer  *s_adjust_layer  = NULL;
 
+static Window *s_quicklog_window = NULL;
+static Layer  *s_quicklog_layer  = NULL;
+
+static Window    *s_history_window = NULL;
+static MenuLayer *s_history_menu_layer = NULL;
+
 // ============================================================================
 // Number Picker State
 // ============================================================================
@@ -141,6 +147,9 @@ static void session_window_unload(Window *window);
 static void adjust_window_load(Window *window);
 static void adjust_window_unload(Window *window);
 static void open_session(void);
+static void open_quicklog(void);
+static void open_history(void);
+static void update_app_glance(void);
 
 // ============================================================================
 // Push-up Session State
@@ -379,9 +388,68 @@ static void check_and_reset_daily_count(void) {
     s_last_date_yday = today_yday;
     run_adaptive_algorithm();
     save_settings();
+    update_app_glance();
     APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: New day. Effective goal=%d, type=%d, streak=%d",
             s_effective_daily_goal, s_today_day_type, s_consecutive_train_days);
   }
+}
+
+// ============================================================================
+// Streak & History Utilities
+// ============================================================================
+static uint16_t calculate_streak(void) {
+  uint16_t streak = 0;
+  // Iterate backwards from the most recent day (index: s_history_count - 1)
+  for (int i = s_history_count - 1; i >= 0; i--) {
+    // If achieved meets target (note: Rest Days have target 0, so 0 >= 0 is true)
+    if (s_history[i].achieved >= s_history[i].target) {
+      streak++;
+    } else {
+      break; // Streak broken
+    }
+  }
+  
+  // Add today if already achieved
+  if (s_daily_count >= s_effective_daily_goal) {
+    streak++;
+  }
+  return streak;
+}
+
+// ============================================================================
+// App Glance Integration
+// ============================================================================
+#if !PBL_PLATFORM_APLITE
+static void glance_reload_callback(AppGlanceReloadSession *session, size_t limit, void *context) {
+  if (limit < 1) return;
+
+  static char glance_text[48];
+  
+  if (s_today_day_type == DAY_TYPE_REST) {
+    snprintf(glance_text, sizeof(glance_text), "%s", translate("Ruhetag", "Rest Day"));
+  } else {
+    snprintf(glance_text, sizeof(glance_text), "%d/%d Push-ups", s_daily_count, s_effective_daily_goal);
+  }
+
+  AppGlanceSlice slice = {
+    .expiration_time = APP_GLANCE_SLICE_NO_EXPIRATION,
+    .layout = {
+      .icon = APP_GLANCE_SLICE_DEFAULT_ICON,
+      .subtitle_template_string = glance_text,
+    }
+  };
+
+  AppGlanceResult result = app_glance_add_slice(session, slice);
+  if (result != APP_GLANCE_RESULT_SUCCESS) {
+    APP_LOG(APP_LOG_LEVEL_ERROR, "Glance Error: %d", result);
+  }
+}
+#endif
+
+static void update_app_glance(void) {
+#if !PBL_PLATFORM_APLITE
+  app_glance_reload(glance_reload_callback, NULL);
+#endif
 }
 
 // ============================================================================
@@ -853,6 +921,7 @@ static void adjust_select_handler(ClickRecognizerRef recognizer, void *context) 
   // Confirm: add to daily total
   s_daily_count += s_adjust_count;
   save_settings();
+  update_app_glance();
 
   vibes_double_pulse();
 
@@ -1138,6 +1207,208 @@ static void open_picker(PickerType type, int current, int min, int max, int step
 }
 
 // ============================================================================
+// Quick Log Window
+// ============================================================================
+static uint16_t s_quicklog_count = 0;
+
+static void quicklog_layer_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+
+  // Background
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+
+  // Header
+  int header_h = 30;
+  graphics_context_set_fill_color(ctx, GColorCobaltBlue);
+  graphics_fill_rect(ctx, GRect(0, 0, bounds.size.w, header_h), 0, GCornerNone);
+  graphics_context_set_text_color(ctx, GColorWhite);
+  graphics_draw_text(ctx, translate("QUICK LOG", "QUICK LOG"),
+                     fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
+                     GRect(4, 4, bounds.size.w - 8, header_h - 4),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+
+  // Count display
+  static char ql_buf[8];
+  snprintf(ql_buf, sizeof(ql_buf), "%d", s_quicklog_count);
+  graphics_context_set_text_color(ctx, GColorBlack);
+  graphics_draw_text(ctx, ql_buf,
+                     fonts_get_system_font(FONT_KEY_BITHAM_42_MEDIUM_NUMBERS),
+                     GRect(10, bounds.size.h / 2 - 30, bounds.size.w - 20, 50),
+                     GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
+
+  // Arrows
+  int arrow_y_up = header_h + 8;
+  int arrow_y_dn = bounds.size.h - 22;
+  graphics_context_set_fill_color(ctx, GColorDarkGray);
+
+  GPoint up_pts[3] = {
+    {bounds.size.w / 2, arrow_y_up},
+    {bounds.size.w / 2 - 8, arrow_y_up + 10},
+    {bounds.size.w / 2 + 8, arrow_y_up + 10}
+  };
+  GPathInfo up_info = { .num_points = 3, .points = up_pts };
+  GPath *up_path = gpath_create(&up_info);
+  gpath_draw_filled(ctx, up_path);
+  gpath_destroy(up_path);
+
+  GPoint dn_pts[3] = {
+    {bounds.size.w / 2, arrow_y_dn + 10},
+    {bounds.size.w / 2 - 8, arrow_y_dn},
+    {bounds.size.w / 2 + 8, arrow_y_dn}
+  };
+  GPathInfo dn_info = { .num_points = 3, .points = dn_pts };
+  GPath *dn_path = gpath_create(&dn_info);
+  gpath_draw_filled(ctx, dn_path);
+  gpath_destroy(dn_path);
+
+  // Hint
+  graphics_context_set_text_color(ctx, GColorDarkGray);
+  graphics_draw_text(ctx, translate("SEL: Speichern | BACK: Abbruch",
+                                     "SEL: Save | BACK: Cancel"),
+                     fonts_get_system_font(FONT_KEY_GOTHIC_14),
+                     GRect(4, bounds.size.h - 16, bounds.size.w - 8, 16),
+                     GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
+}
+
+static void quicklog_up_handler(ClickRecognizerRef recognizer, void *context) {
+  s_quicklog_count++;
+  if (s_quicklog_layer) layer_mark_dirty(s_quicklog_layer);
+}
+
+static void quicklog_down_handler(ClickRecognizerRef recognizer, void *context) {
+  if (s_quicklog_count > 0) s_quicklog_count--;
+  if (s_quicklog_layer) layer_mark_dirty(s_quicklog_layer);
+}
+
+static void quicklog_select_handler(ClickRecognizerRef recognizer, void *context) {
+  if (s_quicklog_count > 0) {
+    s_daily_count += s_quicklog_count;
+    save_settings();
+    update_app_glance();
+    vibes_double_pulse();
+
+    if (s_main_menu_layer) {
+      menu_layer_reload_data(s_main_menu_layer);
+    }
+    
+    APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: Quick Log added %d, daily total now %d",
+            s_quicklog_count, s_daily_count);
+  }
+  window_stack_pop(true);
+}
+
+static void quicklog_back_handler(ClickRecognizerRef recognizer, void *context) {
+  window_stack_pop(true);
+}
+
+static void quicklog_click_config_provider(void *context) {
+  window_single_click_subscribe(BUTTON_ID_UP, quicklog_up_handler);
+  window_single_click_subscribe(BUTTON_ID_DOWN, quicklog_down_handler);
+  window_single_click_subscribe(BUTTON_ID_SELECT, quicklog_select_handler);
+  window_single_click_subscribe(BUTTON_ID_BACK, quicklog_back_handler);
+}
+
+static void quicklog_window_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+
+  s_quicklog_layer = layer_create(bounds);
+  layer_set_update_proc(s_quicklog_layer, quicklog_layer_update_proc);
+  layer_add_child(window_layer, s_quicklog_layer);
+
+  window_set_click_config_provider(window, quicklog_click_config_provider);
+}
+
+static void quicklog_window_unload(Window *window) {
+  layer_destroy(s_quicklog_layer);
+  s_quicklog_layer = NULL;
+}
+
+static void open_quicklog(void) {
+  s_quicklog_count = 0;
+  if (!s_quicklog_window) {
+    s_quicklog_window = window_create();
+    window_set_window_handlers(s_quicklog_window, (WindowHandlers) {
+      .load = quicklog_window_load,
+      .unload = quicklog_window_unload
+    });
+  }
+  window_stack_push(s_quicklog_window, true);
+}
+
+// ============================================================================
+// History Window
+// ============================================================================
+static uint16_t history_menu_get_num_rows(MenuLayer *menu_layer, uint16_t section_index, void *data) {
+  // Row 0 = Streak, Row 1..N = up to 7 history days
+  int count = 1 + (s_history_count > 7 ? 7 : s_history_count);
+  return count;
+}
+
+static void history_menu_draw_row(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *data) {
+  static char title_buf[32];
+  static char subtitle_buf[32];
+
+  if (cell_index->row == 0) {
+    uint16_t streak = calculate_streak();
+    snprintf(title_buf, sizeof(title_buf), "%s: %d", translate("Aktuelle Streak", "Current Streak"), streak);
+    snprintf(subtitle_buf, sizeof(subtitle_buf), "%s", translate("Tage in Folge", "Consecutive days"));
+    menu_cell_basic_draw(ctx, cell_layer, title_buf, subtitle_buf, NULL);
+  } else {
+    // Offset by 1 for the streak row. Days are displayed from newest (index history_count - 1) backwards.
+    int history_idx = s_history_count - cell_index->row;
+    if (history_idx >= 0 && history_idx < s_history_count) {
+      DayRecord *record = &s_history[history_idx];
+      
+      snprintf(title_buf, sizeof(title_buf), "%s %d", translate("Vor", "Days ago:"), cell_index->row);
+      
+      if (record->day_type == DAY_TYPE_REST) {
+        snprintf(subtitle_buf, sizeof(subtitle_buf), "%s", translate("Ruhetag", "Rest Day"));
+      } else {
+        snprintf(subtitle_buf, sizeof(subtitle_buf), "%d / %d", record->achieved, record->target);
+      }
+      menu_cell_basic_draw(ctx, cell_layer, title_buf, subtitle_buf, NULL);
+    }
+  }
+}
+
+static void history_window_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+
+  s_history_menu_layer = menu_layer_create(bounds);
+  menu_layer_set_callbacks(s_history_menu_layer, NULL, (MenuLayerCallbacks) {
+    .get_num_rows = history_menu_get_num_rows,
+    .draw_row = history_menu_draw_row,
+  });
+  menu_layer_set_click_config_onto_window(s_history_menu_layer, window);
+
+  #if defined(PBL_COLOR)
+    menu_layer_set_normal_colors(s_history_menu_layer, GColorWhite, GColorBlack);
+    menu_layer_set_highlight_colors(s_history_menu_layer, GColorCobaltBlue, GColorWhite);
+  #endif
+
+  layer_add_child(window_layer, menu_layer_get_layer(s_history_menu_layer));
+}
+
+static void history_window_unload(Window *window) {
+  menu_layer_destroy(s_history_menu_layer);
+  s_history_menu_layer = NULL;
+}
+
+static void open_history(void) {
+  if (!s_history_window) {
+    s_history_window = window_create();
+    window_set_window_handlers(s_history_window, (WindowHandlers) {
+      .load = history_window_load,
+      .unload = history_window_unload
+    });
+  }
+  window_stack_push(s_history_window, true);
+}
+
+// ============================================================================
 // Settings Menu Window
 // ============================================================================
 #define SETTINGS_MENU_NUM_ROWS 4
@@ -1296,12 +1567,12 @@ static void main_menu_select_callback(MenuLayer *menu_layer,
       open_session();
       break;
     case 1:
-      // TODO: US-5 - Quick Log
-      vibes_short_pulse();
+      // US-5: Quick Log
+      open_quicklog();
       break;
     case 2:
-      // TODO: US-5 - History
-      vibes_short_pulse();
+      // US-5: History
+      open_history();
       break;
     case 3:
       // Open Settings Menu
@@ -1460,6 +1731,12 @@ static void deinit(void) {
   save_settings();
 
   // Destroy windows
+  if (s_history_window) {
+    window_destroy(s_history_window);
+  }
+  if (s_quicklog_window) {
+    window_destroy(s_quicklog_window);
+  }
   if (s_adjust_window) {
     window_destroy(s_adjust_window);
   }
