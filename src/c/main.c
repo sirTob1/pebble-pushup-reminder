@@ -561,7 +561,7 @@ static void reminder_layer_update_proc(Layer *layer, GContext *ctx) {
 
   graphics_context_set_text_color(ctx, GColorBlack);
   graphics_draw_text(ctx, progress_buf,
-                     fonts_get_system_font(FONT_KEY_BITHAM_42_MEDIUM_NUMBERS),
+                     fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD),
                      GRect(10, header_h + 15, bounds.size.w - 20, 50),
                      GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
 
@@ -882,7 +882,7 @@ static void adjust_layer_update_proc(Layer *layer, GContext *ctx) {
   snprintf(adj_buf, sizeof(adj_buf), "%d", s_adjust_count);
   graphics_context_set_text_color(ctx, GColorBlack);
   graphics_draw_text(ctx, adj_buf,
-                     fonts_get_system_font(FONT_KEY_BITHAM_42_MEDIUM_NUMBERS),
+                     fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD),
                      GRect(10, bounds.size.h / 2 - 30, bounds.size.w - 20, 50),
                      GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
 
@@ -1085,7 +1085,7 @@ static void picker_layer_update_proc(Layer *layer, GContext *ctx) {
 
   graphics_context_set_text_color(ctx, GColorBlack);
   graphics_draw_text(ctx, val_buf,
-                     fonts_get_system_font(FONT_KEY_BITHAM_42_MEDIUM_NUMBERS),
+                     fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD),
                      GRect(10, bounds.size.h / 2 - 30, bounds.size.w - 20, 50),
                      GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
 
@@ -1248,7 +1248,7 @@ static void quicklog_layer_update_proc(Layer *layer, GContext *ctx) {
   snprintf(ql_buf, sizeof(ql_buf), "%d", s_quicklog_count);
   graphics_context_set_text_color(ctx, GColorBlack);
   graphics_draw_text(ctx, ql_buf,
-                     fonts_get_system_font(FONT_KEY_BITHAM_42_MEDIUM_NUMBERS),
+                     fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD),
                      GRect(10, bounds.size.h / 2 - 30, bounds.size.w - 20, 50),
                      GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
 
