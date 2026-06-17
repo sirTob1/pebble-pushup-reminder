@@ -102,11 +102,7 @@ static Layer  *s_picker_layer  = NULL;
 static Window *s_reminder_window = NULL;
 static Layer  *s_reminder_layer  = NULL;
 
-static Window *s_session_window = NULL;
-static Layer  *s_session_layer  = NULL;
 
-static Window *s_adjust_window = NULL;
-static Layer  *s_adjust_layer  = NULL;
 
 static Window *s_quicklog_window = NULL;
 static Layer  *s_quicklog_layer  = NULL;
@@ -142,48 +138,11 @@ static void reminder_window_unload(Window *window);
 static void schedule_next_wakeup(void);
 static void check_and_reset_daily_count(void);
 static void run_adaptive_algorithm(void);
-static void session_window_load(Window *window);
-static void session_window_unload(Window *window);
-static void adjust_window_load(Window *window);
-static void adjust_window_unload(Window *window);
-static void open_session(void);
+
 static void open_quicklog(void);
 static void open_history(void);
 static void update_app_glance(void);
 
-// ============================================================================
-// Push-up Session State
-// ============================================================================
-typedef enum {
-  SESSION_IDLE = 0,
-  SESSION_ACTIVE,
-  SESSION_PAUSED
-} SessionState;
-
-// Accelerometer detection state machine
-typedef enum {
-  DETECT_IDLE = 0,  // waiting for downward movement
-  DETECT_DOWN,      // detected downward phase
-  DETECT_UP         // detected upward phase (rep counted)
-} DetectPhase;
-
-static SessionState s_session_state = SESSION_IDLE;
-static DetectPhase  s_detect_phase = DETECT_IDLE;
-static uint16_t s_session_count = 0;
-static uint16_t s_adjust_count = 0;
-static time_t   s_session_start_time = 0;
-static uint16_t s_session_elapsed_sec = 0;
-static bool     s_session_accel_subscribed = false;
-
-// Detection parameters
-#define ACCEL_SAMPLE_RATE      ACCEL_SAMPLING_25HZ
-#define ACCEL_BATCH_SIZE       5
-#define PUSHUP_Z_DOWN_THRESH   (-600)  // Z-axis threshold for "down" phase (milli-g)
-#define PUSHUP_Z_UP_THRESH     (-200)  // Z-axis threshold for "up" phase (milli-g)
-#define PUSHUP_COOLDOWN_MS     400     // minimum time between reps in ms
-#define PUSHUP_MAG_MIN         800     // minimum magnitude to filter noise
-
-static uint32_t s_last_rep_time_ms = 0;  // last rep timestamp (ms)
 
 // ============================================================================
 // Persistent Storage: Load & Save
@@ -654,387 +613,6 @@ static void wakeup_handler(WakeupId id, int32_t reason) {
   }
 }
 
-// ============================================================================
-// Push-up Session: Accelerometer Handler
-// ============================================================================
-static void accel_data_handler(AccelData *data, uint32_t num_samples) {
-  if (s_session_state != SESSION_ACTIVE) return;
-
-  for (uint32_t i = 0; i < num_samples; i++) {
-    // Skip noisy samples caused by vibration motor
-    if (data[i].did_vibrate) continue;
-
-    int16_t z = data[i].z;
-
-    // Calculate rough magnitude to filter non-exercise noise
-    // Using simplified |x|+|y|+|z| instead of sqrt for CPU efficiency
-    int32_t mag = (data[i].x < 0 ? -data[i].x : data[i].x)
-                + (data[i].y < 0 ? -data[i].y : data[i].y)
-                + (z < 0 ? -z : z);
-    if (mag < PUSHUP_MAG_MIN) continue;
-
-    // State machine: detect push-up cycle via Z-axis
-    // During push-up, wrist faces down. Z ~ -1000 at rest position (top).
-    // Going down: Z becomes less negative (closer to 0 or positive).
-    // Coming back up: Z returns to strongly negative.
-    switch (s_detect_phase) {
-      case DETECT_IDLE:
-        // Wait for Z to rise above UP threshold (wrist moving down = body lowering)
-        if (z > PUSHUP_Z_UP_THRESH) {
-          s_detect_phase = DETECT_DOWN;
-        }
-        break;
-
-      case DETECT_DOWN:
-        // Wait for Z to drop below DOWN threshold (wrist returning = body pushing up)
-        if (z < PUSHUP_Z_DOWN_THRESH) {
-          // Check cooldown to avoid double counting
-          uint32_t now_ms = (uint32_t)(time(NULL) * 1000);  // rough ms
-          if (now_ms - s_last_rep_time_ms > PUSHUP_COOLDOWN_MS || s_last_rep_time_ms == 0) {
-            s_session_count++;
-            s_last_rep_time_ms = now_ms;
-            s_detect_phase = DETECT_UP;
-
-            // Haptic feedback (light tap)
-            vibes_short_pulse();
-
-            // Update display
-            if (s_session_layer) {
-              layer_mark_dirty(s_session_layer);
-            }
-          }
-        }
-        // If Z returns to very negative without completing: reset
-        if (z < PUSHUP_Z_DOWN_THRESH - 200) {
-          s_detect_phase = DETECT_IDLE;
-        }
-        break;
-
-      case DETECT_UP:
-        // Wait for Z to rise again above UP threshold (reset for next rep)
-        if (z > PUSHUP_Z_UP_THRESH) {
-          s_detect_phase = DETECT_IDLE;
-        }
-        break;
-    }
-  }
-}
-
-// ============================================================================
-// Push-up Session: Timer Tick (once per second)
-// ============================================================================
-static void session_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  if (s_session_state == SESSION_ACTIVE && s_session_start_time > 0) {
-    s_session_elapsed_sec = (uint16_t)(time(NULL) - s_session_start_time);
-    if (s_session_layer) {
-      layer_mark_dirty(s_session_layer);
-    }
-  }
-}
-
-// ============================================================================
-// Push-up Session: Window
-// ============================================================================
-static void session_layer_update_proc(Layer *layer, GContext *ctx) {
-  GRect bounds = layer_get_bounds(layer);
-
-  // Background
-  graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-
-  // Header bar with state
-  int header_h = 28;
-  GColor header_color = (s_session_state == SESSION_PAUSED) ? GColorDarkGray : GColorIslamicGreen;
-  graphics_context_set_fill_color(ctx, header_color);
-  graphics_fill_rect(ctx, GRect(0, 0, bounds.size.w, header_h), 0, GCornerNone);
-
-  const char *state_text = "";
-  switch (s_session_state) {
-    case SESSION_ACTIVE: state_text = translate("AKTIVE SESSION", "ACTIVE SESSION"); break;
-    case SESSION_PAUSED: state_text = translate("PAUSIERT", "PAUSED"); break;
-    default: state_text = ""; break;
-  }
-  graphics_context_set_text_color(ctx, GColorWhite);
-  graphics_draw_text(ctx, state_text,
-                     fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
-                     GRect(4, 2, bounds.size.w - 8, header_h - 2),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-
-  // Large count display
-  static char count_buf[8];
-  snprintf(count_buf, sizeof(count_buf), "%d", s_session_count);
-  graphics_context_set_text_color(ctx, GColorWhite);
-  graphics_draw_text(ctx, count_buf,
-                     fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD),
-                     GRect(10, header_h + 10, bounds.size.w - 20, 50),
-                     GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
-
-  // Label
-  graphics_context_set_text_color(ctx, GColorLightGray);
-  graphics_draw_text(ctx, "PUSH-UPS",
-                     fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
-                     GRect(10, header_h + 58, bounds.size.w - 20, 24),
-                     GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
-
-  // Timer display
-  static char timer_buf[16];
-  uint16_t mins = s_session_elapsed_sec / 60;
-  uint16_t secs = s_session_elapsed_sec % 60;
-  snprintf(timer_buf, sizeof(timer_buf), "%02d:%02d", mins, secs);
-  graphics_context_set_text_color(ctx, GColorCadetBlue);
-  graphics_draw_text(ctx, timer_buf,
-                     fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
-                     GRect(10, header_h + 82, bounds.size.w - 20, 30),
-                     GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
-
-  // Button hints at bottom
-  graphics_context_set_text_color(ctx, GColorDarkGray);
-  const char *hint = "";
-  if (s_session_state == SESSION_ACTIVE) {
-    hint = translate("SEL:Pause  BACK:Fertig", "SEL:Pause  BACK:Finish");
-  } else if (s_session_state == SESSION_PAUSED) {
-    hint = translate("SEL:Weiter  BACK:Fertig", "SEL:Resume  BACK:Finish");
-  }
-  graphics_draw_text(ctx, hint,
-                     fonts_get_system_font(FONT_KEY_GOTHIC_14),
-                     GRect(4, bounds.size.h - 18, bounds.size.w - 8, 16),
-                     GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
-}
-
-static void session_select_handler(ClickRecognizerRef recognizer, void *context) {
-  if (s_session_state == SESSION_ACTIVE) {
-    // Pause
-    s_session_state = SESSION_PAUSED;
-    if (s_session_accel_subscribed) {
-      accel_data_service_unsubscribe();
-      s_session_accel_subscribed = false;
-    }
-  } else if (s_session_state == SESSION_PAUSED) {
-    // Resume
-    s_session_state = SESSION_ACTIVE;
-    s_detect_phase = DETECT_IDLE;
-    accel_data_service_subscribe(ACCEL_BATCH_SIZE, accel_data_handler);
-    accel_service_set_sampling_rate(ACCEL_SAMPLE_RATE);
-    s_session_accel_subscribed = true;
-  }
-  if (s_session_layer) layer_mark_dirty(s_session_layer);
-}
-
-static void session_finish(void);
-
-static void session_back_handler(ClickRecognizerRef recognizer, void *context) {
-  // Finish session -> go to adjustment screen
-  session_finish();
-}
-
-static void session_click_config_provider(void *context) {
-  window_single_click_subscribe(BUTTON_ID_SELECT, session_select_handler);
-  window_single_click_subscribe(BUTTON_ID_BACK, session_back_handler);
-}
-
-static void session_window_load(Window *window) {
-  Layer *window_layer = window_get_root_layer(window);
-  GRect bounds = layer_get_bounds(window_layer);
-
-  s_session_layer = layer_create(bounds);
-  layer_set_update_proc(s_session_layer, session_layer_update_proc);
-  layer_add_child(window_layer, s_session_layer);
-
-  window_set_click_config_provider(window, session_click_config_provider);
-}
-
-static void session_window_unload(Window *window) {
-  // Cleanup accelerometer
-  if (s_session_accel_subscribed) {
-    accel_data_service_unsubscribe();
-    s_session_accel_subscribed = false;
-  }
-  // Unsubscribe tick timer
-  tick_timer_service_unsubscribe();
-
-  layer_destroy(s_session_layer);
-  s_session_layer = NULL;
-  s_session_state = SESSION_IDLE;
-}
-
-// ============================================================================
-// Push-up Session: Adjustment Window (post-session correction)
-// ============================================================================
-static void adjust_layer_update_proc(Layer *layer, GContext *ctx) {
-  GRect bounds = layer_get_bounds(layer);
-
-  // Background
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-
-  // Header
-  int header_h = 30;
-  graphics_context_set_fill_color(ctx, GColorCobaltBlue);
-  graphics_fill_rect(ctx, GRect(0, 0, bounds.size.w, header_h), 0, GCornerNone);
-  graphics_context_set_text_color(ctx, GColorWhite);
-  graphics_draw_text(ctx, translate("ERGEBNIS ANPASSEN", "ADJUST COUNT"),
-                     fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
-                     GRect(4, 4, bounds.size.w - 8, header_h - 4),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-
-  // Count display
-  static char adj_buf[8];
-  snprintf(adj_buf, sizeof(adj_buf), "%d", s_adjust_count);
-  graphics_context_set_text_color(ctx, GColorBlack);
-  graphics_draw_text(ctx, adj_buf,
-                     fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD),
-                     GRect(10, bounds.size.h / 2 - 30, bounds.size.w - 20, 50),
-                     GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
-
-  // Arrows
-  int arrow_y_up = header_h + 8;
-  int arrow_y_dn = bounds.size.h - 22;
-  graphics_context_set_fill_color(ctx, GColorDarkGray);
-
-  GPoint up_pts[3] = {
-    {bounds.size.w / 2, arrow_y_up},
-    {bounds.size.w / 2 - 8, arrow_y_up + 10},
-    {bounds.size.w / 2 + 8, arrow_y_up + 10}
-  };
-  GPathInfo up_info = { .num_points = 3, .points = up_pts };
-  GPath *up_path = gpath_create(&up_info);
-  gpath_draw_filled(ctx, up_path);
-  gpath_destroy(up_path);
-
-  GPoint dn_pts[3] = {
-    {bounds.size.w / 2, arrow_y_dn + 10},
-    {bounds.size.w / 2 - 8, arrow_y_dn},
-    {bounds.size.w / 2 + 8, arrow_y_dn}
-  };
-  GPathInfo dn_info = { .num_points = 3, .points = dn_pts };
-  GPath *dn_path = gpath_create(&dn_info);
-  gpath_draw_filled(ctx, dn_path);
-  gpath_destroy(dn_path);
-
-  // Hint
-  graphics_context_set_text_color(ctx, GColorDarkGray);
-  graphics_draw_text(ctx, translate("SEL: Best\xC3\xA4tigen | BACK: Abbruch",
-                                     "SEL: Confirm | BACK: Cancel"),
-                     fonts_get_system_font(FONT_KEY_GOTHIC_14),
-                     GRect(4, bounds.size.h - 16, bounds.size.w - 8, 16),
-                     GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
-}
-
-static void adjust_up_handler(ClickRecognizerRef recognizer, void *context) {
-  s_adjust_count++;
-  if (s_adjust_layer) layer_mark_dirty(s_adjust_layer);
-}
-
-static void adjust_down_handler(ClickRecognizerRef recognizer, void *context) {
-  if (s_adjust_count > 0) s_adjust_count--;
-  if (s_adjust_layer) layer_mark_dirty(s_adjust_layer);
-}
-
-static void adjust_select_handler(ClickRecognizerRef recognizer, void *context) {
-  // Confirm: add to daily total
-  s_daily_count += s_adjust_count;
-  save_settings();
-  update_app_glance();
-  send_pushup_log(s_adjust_count);
-  schedule_next_wakeup();
-
-  vibes_double_pulse();
-
-  // Refresh main menu
-  if (s_main_menu_layer) {
-    menu_layer_reload_data(s_main_menu_layer);
-  }
-
-  // Pop adjustment window, then session window
-  window_stack_pop(true);  // pop adjust
-  window_stack_pop(true);  // pop session
-
-  APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: Session confirmed. Added %d, daily total now %d",
-          s_adjust_count, s_daily_count);
-}
-
-static void adjust_back_handler(ClickRecognizerRef recognizer, void *context) {
-  // Cancel: discard session results
-  window_stack_pop(true);  // pop adjust
-  window_stack_pop(true);  // pop session
-}
-
-static void adjust_click_config_provider(void *context) {
-  window_single_click_subscribe(BUTTON_ID_UP, adjust_up_handler);
-  window_single_click_subscribe(BUTTON_ID_DOWN, adjust_down_handler);
-  window_single_click_subscribe(BUTTON_ID_SELECT, adjust_select_handler);
-  window_single_click_subscribe(BUTTON_ID_BACK, adjust_back_handler);
-}
-
-static void adjust_window_load(Window *window) {
-  Layer *window_layer = window_get_root_layer(window);
-  GRect bounds = layer_get_bounds(window_layer);
-
-  s_adjust_layer = layer_create(bounds);
-  layer_set_update_proc(s_adjust_layer, adjust_layer_update_proc);
-  layer_add_child(window_layer, s_adjust_layer);
-
-  window_set_click_config_provider(window, adjust_click_config_provider);
-}
-
-static void adjust_window_unload(Window *window) {
-  layer_destroy(s_adjust_layer);
-  s_adjust_layer = NULL;
-}
-
-// ============================================================================
-// Push-up Session: Control Functions
-// ============================================================================
-static void session_finish(void) {
-  // Stop accelerometer
-  if (s_session_accel_subscribed) {
-    accel_data_service_unsubscribe();
-    s_session_accel_subscribed = false;
-  }
-  s_session_state = SESSION_IDLE;
-  tick_timer_service_unsubscribe();
-
-  // Initialize adjustment with session count
-  s_adjust_count = s_session_count;
-
-  // Push adjustment window
-  if (!s_adjust_window) {
-    s_adjust_window = window_create();
-    window_set_window_handlers(s_adjust_window, (WindowHandlers) {
-      .load = adjust_window_load,
-      .unload = adjust_window_unload
-    });
-  }
-  window_stack_push(s_adjust_window, true);
-}
-
-static void open_session(void) {
-  // Reset session state
-  s_session_count = 0;
-  s_session_elapsed_sec = 0;
-  s_session_start_time = time(NULL);
-  s_session_state = SESSION_ACTIVE;
-  s_detect_phase = DETECT_IDLE;
-  s_last_rep_time_ms = 0;
-
-  // Subscribe to accelerometer
-  accel_data_service_subscribe(ACCEL_BATCH_SIZE, accel_data_handler);
-  accel_service_set_sampling_rate(ACCEL_SAMPLE_RATE);
-  s_session_accel_subscribed = true;
-
-  // Subscribe to tick timer for elapsed time
-  tick_timer_service_subscribe(SECOND_UNIT, session_tick_handler);
-
-  // Push session window
-  if (!s_session_window) {
-    s_session_window = window_create();
-    window_set_window_handlers(s_session_window, (WindowHandlers) {
-      .load = session_window_load,
-      .unload = session_window_unload
-    });
-  }
-  window_stack_push(s_session_window, true);
-}
 
 // ============================================================================
 // Number Picker Window
@@ -1144,6 +722,9 @@ static void picker_select_handler(ClickRecognizerRef recognizer, void *context) 
   switch (s_picker_type) {
     case PICKER_DAILY_GOAL:
       s_daily_goal = (uint16_t)s_picker_value;
+      s_effective_daily_goal = s_daily_goal;
+      s_today_day_type = DAY_TYPE_TRAINING_NORMAL;
+      s_consecutive_train_days = 0;
       break;
     case PICKER_REMINDER_INTERVAL:
       s_reminder_interval = (uint16_t)s_picker_value;
@@ -1446,7 +1027,7 @@ static void settings_menu_draw_row(GContext *ctx, const Layer *cell_layer,
                translate("%d (Adaptiv: %d)", "%d (Adaptive: %d)"),
                s_daily_goal, s_effective_daily_goal);
       menu_cell_basic_draw(ctx, cell_layer,
-                           translate("Basisziel", "Baseline Goal"),
+                           translate("Tagesziel (Manuell)", "Manual Target"),
                            subtitle_buf, NULL);
       break;
     case 1:
@@ -1517,7 +1098,7 @@ static void settings_menu_window_unload(Window *window) {
 // ============================================================================
 // Main Menu Window
 // ============================================================================
-#define MAIN_MENU_NUM_ROWS 4
+#define MAIN_MENU_NUM_ROWS 3
 
 static uint16_t main_menu_get_num_rows(MenuLayer *menu_layer,
                                         uint16_t section_index,
@@ -1530,44 +1111,36 @@ static void main_menu_draw_row(GContext *ctx, const Layer *cell_layer,
   static char status_buf[48];
   switch (cell_index->row) {
     case 0: {
-      // Show today's status with adaptive info
-      const char *status = "";
+      const char *indicator = "";
+      if (s_today_day_type == DAY_TYPE_TRAINING_OVERLOAD) indicator = "[+] ";
+      else if (s_today_day_type == DAY_TYPE_TRAINING_DELOAD) indicator = "[-] ";
+      else if (s_today_day_type == DAY_TYPE_REST) indicator = "[Zzz] ";
+
+      const char *status_text = "";
       switch (s_today_day_type) {
-        case DAY_TYPE_TRAINING_OVERLOAD:
-          status = translate("Training: Steigerung", "Training: Overload");
-          break;
-        case DAY_TYPE_TRAINING_DELOAD:
-          status = translate("Training: Erholung", "Training: Deload");
-          break;
-        case DAY_TYPE_TRAINING_NORMAL:
-          status = translate("Training: Normal", "Training: Normal");
-          break;
-        case DAY_TYPE_REST:
-          status = translate("Ruhetag: Regeneration", "Rest Day: Recovery");
-          break;
+        case DAY_TYPE_TRAINING_OVERLOAD: status_text = translate("Steigerung", "Overload"); break;
+        case DAY_TYPE_TRAINING_DELOAD: status_text = translate("Erholung", "Deload"); break;
+        case DAY_TYPE_TRAINING_NORMAL: status_text = translate("Normal", "Normal"); break;
+        case DAY_TYPE_REST: status_text = translate("Regeneration", "Recovery"); break;
       }
+
       if (s_today_day_type == DAY_TYPE_REST) {
-        snprintf(status_buf, sizeof(status_buf), "%s", status);
+        snprintf(status_buf, sizeof(status_buf), "%s%s", indicator, status_text);
       } else {
-        snprintf(status_buf, sizeof(status_buf), "%d/%d - %s",
-                 s_daily_count, s_effective_daily_goal, status);
+        snprintf(status_buf, sizeof(status_buf), "%d/%d %s%s",
+                 s_daily_count, s_effective_daily_goal, indicator, status_text);
       }
       menu_cell_basic_draw(ctx, cell_layer,
-                           translate("Session starten", "Start Session"),
+                           translate("Eintragen", "Log Pushups"),
                            status_buf, NULL);
       break;
     }
     case 1:
       menu_cell_basic_draw(ctx, cell_layer,
-                           translate("Schnell eintragen", "Quick Log"),
-                           translate("Manuell hinzuf\xC3\xBCgen", "Add manually"), NULL);
-      break;
-    case 2:
-      menu_cell_basic_draw(ctx, cell_layer,
                            translate("Verlauf", "History"),
                            translate("Letzte 7 Tage", "Last 7 days"), NULL);
       break;
-    case 3:
+    case 2:
       menu_cell_basic_draw(ctx, cell_layer,
                            translate("Einstellungen", "Settings"),
                            translate("Ziel, Timer, Zeitfenster", "Goal, Timer, Window"), NULL);
@@ -1580,18 +1153,12 @@ static void main_menu_select_callback(MenuLayer *menu_layer,
                                        void *data) {
   switch (cell_index->row) {
     case 0:
-      // US-4: Start Push-up Session
-      open_session();
-      break;
-    case 1:
-      // US-5: Quick Log
       open_quicklog();
       break;
-    case 2:
-      // US-5: History
+    case 1:
       open_history();
       break;
-    case 3:
+    case 2:
       // Open Settings Menu
       if (!s_settings_menu_window) {
         s_settings_menu_window = window_create();
@@ -1754,12 +1321,7 @@ static void deinit(void) {
   if (s_quicklog_window) {
     window_destroy(s_quicklog_window);
   }
-  if (s_adjust_window) {
-    window_destroy(s_adjust_window);
-  }
-  if (s_session_window) {
-    window_destroy(s_session_window);
-  }
+
   if (s_reminder_window) {
     window_destroy(s_reminder_window);
   }
