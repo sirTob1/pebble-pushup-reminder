@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **Language Persistence**: Fixed an issue where changing the language in the Settings page was not correctly saved and applied due to incorrect string-to-integer conversion (US-11).
+
 ## [1.1.0] - 2026-06-17
 
 ### Added

@@ -1204,7 +1204,11 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   // Language
   Tuple *lang_t = dict_find(iter, MESSAGE_KEY_LANGUAGE);
   if (lang_t) {
-    s_language = (AppLanguage)lang_t->value->uint8;
+    if (lang_t->type == TUPLE_CSTRING) {
+      s_language = (AppLanguage)(lang_t->value->cstring[0] - '0');
+    } else {
+      s_language = (AppLanguage)lang_t->value->uint8;
+    }
     persist_write_int(PERSIST_KEY_LANGUAGE, s_language);
     if (s_main_menu_layer) menu_layer_reload_data(s_main_menu_layer);
     if (s_settings_menu_layer) menu_layer_reload_data(s_settings_menu_layer);

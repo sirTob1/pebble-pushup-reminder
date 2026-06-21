@@ -22,7 +22,11 @@ Pebble.addEventListener('webviewclosed', function(e) {
   var msg = {};
   for (var key in dict) {
     if (dict.hasOwnProperty(key)) {
-       msg[key] = dict[key];
+       if (key === 'LANGUAGE' && typeof dict[key] === 'string') {
+         msg[key] = parseInt(dict[key], 10);
+       } else {
+         msg[key] = dict[key];
+       }
     }
   }
 
