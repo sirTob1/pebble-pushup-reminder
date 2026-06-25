@@ -6,7 +6,7 @@ Dieses Dokument legt die grundlegenden Vereinbarungen für die Zusammenarbeit un
 
 * **Kein Feature ohne User Story:** Für jedes zu entwickelnde Feature muss zwingend eine entsprechende User Story vorliegen.
 * **Sprachregelung:** Alle User Stories und die dazugehörigen Akzeptanzkriterien müssen **grundsätzlich auf Englisch** verfasst sein.
-* **Ablageort:** Die Anforderungen und User Stories werden direkt in diesem GitHub-Repository hinterlegt und gepflegt.
+* **Ablageort:** Die Anforderungen und User Stories werden **ausschließlich als GitHub Issues** in diesem Repository hinterlegt und gepflegt. Lokale Markdown-Dateien für User Stories sind veraltet und nicht mehr zulässig.
 
 ---
 
