@@ -901,8 +901,8 @@ static void quicklog_back_handler(ClickRecognizerRef recognizer, void *context) 
 }
 
 static void quicklog_click_config_provider(void *context) {
-  window_single_click_subscribe(BUTTON_ID_UP, quicklog_up_handler);
-  window_single_click_subscribe(BUTTON_ID_DOWN, quicklog_down_handler);
+  window_single_repeating_click_subscribe(BUTTON_ID_UP, 100, quicklog_up_handler);
+  window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 100, quicklog_down_handler);
   window_single_click_subscribe(BUTTON_ID_SELECT, quicklog_select_handler);
   window_single_click_subscribe(BUTTON_ID_BACK, quicklog_back_handler);
 }

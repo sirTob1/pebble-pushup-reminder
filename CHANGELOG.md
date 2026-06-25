@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-06-25
+
+### Added
+- **Hold-to-Repeat (US-04):** You can now hold down the Up or Down button in the pushup logging view to continuously increase or decrease the pushup count. This allows for much faster logging of large sets.
+
 ## [1.2.0] - 2026-06-21
 
 ### Fixed
