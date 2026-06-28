@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-06-28
+
+### Fixed
+- **Reliable Daily Reminders (US-12):** Fixed a bug where the background wakeup timer would not schedule a wakeup for the next day once the daily goal was reached or on a rest day. Reminders now correctly start each morning without requiring a manual app launch.
+
 ## [1.3.0] - 2026-06-25
 
 ### Added

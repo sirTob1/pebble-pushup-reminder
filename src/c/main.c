@@ -434,46 +434,55 @@ static void schedule_next_wakeup(void) {
     s_wakeup_id = -1;
   }
 
-  // Don't schedule if rest day or daily goal already met
+  // Check day state and decide if we need to schedule for tomorrow
   check_and_reset_daily_count();
+  
+  bool schedule_for_tomorrow = false;
   if (s_today_day_type == DAY_TYPE_REST) {
-    APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: Rest day, no wakeup scheduled.");
-    save_settings();
-    return;
-  }
-  if (s_daily_count >= s_effective_daily_goal) {
-    APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: Daily goal met (%d/%d), no wakeup scheduled.",
+    APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: Rest day, scheduling wakeup for tomorrow.");
+    schedule_for_tomorrow = true;
+  } else if (s_daily_count >= s_effective_daily_goal) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: Daily goal met (%d/%d), scheduling wakeup for tomorrow.",
             s_daily_count, s_effective_daily_goal);
-    save_settings();
-    return;
+    schedule_for_tomorrow = true;
   }
 
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
   int current_hour = t->tm_hour;
+  time_t wakeup_time;
 
-  // Calculate next wakeup time
-  time_t wakeup_time = now + (s_reminder_interval * 60);
-  struct tm *wt = localtime(&wakeup_time);
-  int wakeup_hour = wt->tm_hour;
+  if (schedule_for_tomorrow) {
+    struct tm tomorrow = *t;
+    tomorrow.tm_mday += 1;
+    tomorrow.tm_hour = s_active_start_hour;
+    tomorrow.tm_min = 0;
+    tomorrow.tm_sec = 0;
+    wakeup_time = mktime(&tomorrow);
+  } else {
+    // Calculate next wakeup time
+    wakeup_time = now + (s_reminder_interval * 60);
+    struct tm *wt = localtime(&wakeup_time);
+    int wakeup_hour = wt->tm_hour;
 
-  // If the wakeup would be outside the active window, schedule for the start of the next active window
-  if (wakeup_hour < s_active_start_hour || wakeup_hour >= s_active_end_hour) {
-    // If we're before the start hour today, schedule for today's start
-    if (current_hour < s_active_start_hour) {
-      struct tm tomorrow = *t;
-      tomorrow.tm_hour = s_active_start_hour;
-      tomorrow.tm_min = 0;
-      tomorrow.tm_sec = 0;
-      wakeup_time = mktime(&tomorrow);
-    } else {
-      // Schedule for tomorrow's start hour
-      struct tm tomorrow = *t;
-      tomorrow.tm_mday += 1;
-      tomorrow.tm_hour = s_active_start_hour;
-      tomorrow.tm_min = 0;
-      tomorrow.tm_sec = 0;
-      wakeup_time = mktime(&tomorrow);
+    // If the wakeup would be outside the active window, schedule for the start of the next active window
+    if (wakeup_hour < s_active_start_hour || wakeup_hour >= s_active_end_hour) {
+      // If we're before the start hour today, schedule for today's start
+      if (current_hour < s_active_start_hour) {
+        struct tm tomorrow = *t;
+        tomorrow.tm_hour = s_active_start_hour;
+        tomorrow.tm_min = 0;
+        tomorrow.tm_sec = 0;
+        wakeup_time = mktime(&tomorrow);
+      } else {
+        // Schedule for tomorrow's start hour
+        struct tm tomorrow = *t;
+        tomorrow.tm_mday += 1;
+        tomorrow.tm_hour = s_active_start_hour;
+        tomorrow.tm_min = 0;
+        tomorrow.tm_sec = 0;
+        wakeup_time = mktime(&tomorrow);
+      }
     }
   }
 
