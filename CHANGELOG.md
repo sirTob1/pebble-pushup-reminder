@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-07-10
+
+### Added
+- **Rest Day Performance Tracking (US-15):** Pushups logged on a rest day now count! If you meet or exceed the target of your last training day on a rest day, it triggers progressive overload. If you do fewer pushups, there is no penalty (no deload), respecting your rest day.
+
 ## [1.4.0] - 2026-06-28
 
 ### Fixed
