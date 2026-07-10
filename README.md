@@ -4,7 +4,7 @@
 Get stronger every day right from your wrist! **Pebble Pushups** is your ultimate personal trainer for the Pebble Smartwatch. Whether you are stuck at a desk or working from home, this app ensures you stay active by gently reminding you to knock out a set of pushups at custom intervals.
 
 ## 🚀 Features
-- **Adaptive Daily Goals**: The app intelligently learns from your performance! Crush your goals to trigger an 'Overload' day with a higher target, or get a 'Deload/Recovery' day if you need a break. You can always override the target manually!
+- **Adaptive Daily Goals**: The app intelligently learns from your performance! Crush your goals to trigger an 'Overload' day with a higher target, or get a 'Deload/Recovery' day if you need a break. Pushups done on a rest day also count and can trigger an 'Overload'. You can always override the target manually!
 - **Smart Reminders**: Set your active time window and reminder intervals. The app uses the reliable Pebble Wakeup API so it doesn't drain your battery while waiting in the background.
 - **Quick Log**: Easily and reliably log your completed pushups. Supports **Hold-to-Repeat**: hold down the up/down buttons to continuously and quickly increase or decrease the pushup count!
 - **Smartphone Dashboard**: Dive into your workout history! Check out a beautiful 14-day performance chart right inside the Pebble app settings on your phone, and export your data as CSV.

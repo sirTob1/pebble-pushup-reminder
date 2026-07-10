@@ -277,6 +277,42 @@ static void run_adaptive_algorithm(void) {
         break;
       }
     }
+    
+    if (yesterday->achieved > 0 && base_goal > 0) {
+      uint32_t pct = (uint32_t)yesterday->achieved * 100 / base_goal;
+      
+      // Fatigue check for rest day
+      if (pct > FATIGUE_EXCESS_PCT) {
+        s_today_day_type = DAY_TYPE_REST;
+        s_effective_daily_goal = 0;
+        s_consecutive_train_days = 0;
+        APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: REST DAY (fatigue from rest day - %d/%d)",
+                yesterday->achieved, base_goal);
+        return;
+      }
+      
+      if (pct >= 100) {
+        // Goal met or exceeded on rest day: Progressive Overload
+        uint16_t increase = (base_goal * OVERLOAD_INCREASE_PCT) / 100;
+        if (increase < 1) increase = 1;
+        s_effective_daily_goal = base_goal + increase;
+        s_today_day_type = DAY_TYPE_TRAINING_OVERLOAD;
+        s_consecutive_train_days++;
+        APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: OVERLOAD (from rest day) %d -> %d (%d%% achieved)",
+                base_goal, s_effective_daily_goal, (int)pct);
+        return;
+      } else {
+        // Did some pushups, but < 100%. No deload penalty on rest days!
+        s_today_day_type = DAY_TYPE_TRAINING_NORMAL;
+        s_effective_daily_goal = base_goal;
+        s_consecutive_train_days++;
+        APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: TRAINING NORMAL (post-rest, partial %d%%), goal=%d",
+                (int)pct, s_effective_daily_goal);
+        return;
+      }
+    }
+
+    // 0 achieved on rest day (or no valid base goal found)
     s_today_day_type = DAY_TYPE_TRAINING_NORMAL;
     s_effective_daily_goal = base_goal;
     s_consecutive_train_days++;
