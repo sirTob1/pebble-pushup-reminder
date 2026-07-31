@@ -27,7 +27,7 @@
 
 // Adaptive goals constants
 #define HISTORY_SIZE            14
-#define MIN_DAILY_GOAL          10
+
 #define MAX_CONSECUTIVE_TRAIN   3
 #define OVERLOAD_INCREASE_PCT   8   // 8% increase on goal met
 #define DELOAD_DECREASE_PCT     10  // 10% decrease on < 80% achieved
@@ -337,8 +337,8 @@ static void run_adaptive_algorithm(void) {
       // Below 80%: Deload
       uint16_t decrease = (base_goal * DELOAD_DECREASE_PCT) / 100;
       if (decrease < 1) decrease = 1;
-      s_effective_daily_goal = base_goal > decrease ? base_goal - decrease : MIN_DAILY_GOAL;
-      if (s_effective_daily_goal < MIN_DAILY_GOAL) s_effective_daily_goal = MIN_DAILY_GOAL;
+      s_effective_daily_goal = base_goal > decrease ? base_goal - decrease : s_daily_goal;
+      if (s_effective_daily_goal < s_daily_goal) s_effective_daily_goal = s_daily_goal;
       s_today_day_type = DAY_TYPE_TRAINING_DELOAD;
       APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: DELOAD %d -> %d (%d%% achieved)",
               base_goal, s_effective_daily_goal, (int)pct);
@@ -762,14 +762,86 @@ static void picker_down_handler(ClickRecognizerRef recognizer, void *context) {
   layer_mark_dirty(s_picker_layer);
 }
 
+static Window *s_confirm_window = NULL;
+static TextLayer *s_confirm_text_layer = NULL;
+static uint16_t s_pending_daily_goal = 0;
+
+static void confirm_save_and_pop(void) {
+  save_settings();
+  vibes_short_pulse();
+  if (s_settings_menu_layer) {
+    menu_layer_reload_data(s_settings_menu_layer);
+  }
+  window_stack_pop(true); // pop confirm
+  window_stack_pop(true); // pop picker
+}
+
+static void confirm_up_handler(ClickRecognizerRef recognizer, void *context) {
+  s_daily_goal = s_pending_daily_goal;
+  s_effective_daily_goal = s_daily_goal;
+  s_today_day_type = DAY_TYPE_TRAINING_NORMAL;
+  s_consecutive_train_days = 0;
+  confirm_save_and_pop();
+}
+
+static void confirm_down_handler(ClickRecognizerRef recognizer, void *context) {
+  s_daily_goal = s_pending_daily_goal;
+  confirm_save_and_pop();
+}
+
+static void confirm_click_config_provider(void *context) {
+  window_single_click_subscribe(BUTTON_ID_UP, confirm_up_handler);
+  window_single_click_subscribe(BUTTON_ID_DOWN, confirm_down_handler);
+}
+
+static void confirm_window_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+  
+  s_confirm_text_layer = text_layer_create(GRect(0, bounds.size.h / 2 - 40, bounds.size.w, 100));
+  text_layer_set_text_alignment(s_confirm_text_layer, GTextAlignmentCenter);
+  text_layer_set_font(s_confirm_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+  
+  static char s_confirm_buf[128];
+  snprintf(s_confirm_buf, sizeof(s_confirm_buf), 
+           translate("Ziel ist %d.\nAuf %d\nzuruecksetzen?\nUP: Ja DOWN: Nein", 
+                     "Goal is %d.\nReset to %d?\nUP: Yes DOWN: No"), 
+           s_effective_daily_goal, s_pending_daily_goal);
+  text_layer_set_text(s_confirm_text_layer, s_confirm_buf);
+  
+  layer_add_child(window_layer, text_layer_get_layer(s_confirm_text_layer));
+}
+
+static void confirm_window_unload(Window *window) {
+  text_layer_destroy(s_confirm_text_layer);
+}
+
+static void open_confirm_dialog(void) {
+  if (!s_confirm_window) {
+    s_confirm_window = window_create();
+    window_set_click_config_provider(s_confirm_window, confirm_click_config_provider);
+    window_set_window_handlers(s_confirm_window, (WindowHandlers) {
+      .load = confirm_window_load,
+      .unload = confirm_window_unload,
+    });
+  }
+  window_stack_push(s_confirm_window, true);
+}
+
 static void picker_select_handler(ClickRecognizerRef recognizer, void *context) {
   // Apply value
   switch (s_picker_type) {
     case PICKER_DAILY_GOAL:
-      s_daily_goal = (uint16_t)s_picker_value;
-      s_effective_daily_goal = s_daily_goal;
-      s_today_day_type = DAY_TYPE_TRAINING_NORMAL;
-      s_consecutive_train_days = 0;
+      s_pending_daily_goal = (uint16_t)s_picker_value;
+      if (s_pending_daily_goal < s_effective_daily_goal) {
+        open_confirm_dialog();
+        return;
+      } else {
+        s_daily_goal = s_pending_daily_goal;
+        if (s_effective_daily_goal < s_daily_goal) {
+          s_effective_daily_goal = s_daily_goal;
+        }
+      }
       break;
     case PICKER_REMINDER_INTERVAL:
       s_reminder_interval = (uint16_t)s_picker_value;
@@ -1072,7 +1144,7 @@ static void settings_menu_draw_row(GContext *ctx, const Layer *cell_layer,
                translate("%d (Adaptiv: %d)", "%d (Adaptive: %d)"),
                s_daily_goal, s_effective_daily_goal);
       menu_cell_basic_draw(ctx, cell_layer,
-                           translate("Tagesziel (Manuell)", "Manual Target"),
+                           translate("Minimalziel", "Minimum Goal"),
                            subtitle_buf, NULL);
       break;
     case 1:
@@ -1264,6 +1336,10 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   if (goal_t) {
     s_daily_goal = goal_t->value->uint16;
     persist_write_int(PERSIST_KEY_DAILY_GOAL, s_daily_goal);
+    if (s_effective_daily_goal < s_daily_goal) {
+      s_effective_daily_goal = s_daily_goal;
+      persist_write_int(PERSIST_KEY_EFFECTIVE_GOAL, s_effective_daily_goal);
+    }
     if (s_settings_menu_layer) menu_layer_reload_data(s_settings_menu_layer);
   }
 
@@ -1379,6 +1455,9 @@ static void deinit(void) {
   }
   if (s_settings_menu_window) {
     window_destroy(s_settings_menu_window);
+  }
+  if (s_confirm_window) {
+    window_destroy(s_confirm_window);
   }
   window_destroy(s_main_menu_window);
 }

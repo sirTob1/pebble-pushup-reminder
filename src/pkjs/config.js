@@ -30,8 +30,8 @@ module.exports = [
         "type": "slider",
         "messageKey": "DAILY_GOAL",
         "defaultValue": 30,
-        "label": "Baseline Daily Goal",
-        "description": "The base number of pushups you want to do per day.",
+        "label": "Minimum Goal / Minimalziel",
+        "description": "The absolute minimum pushup target per day.",
         "min": 10,
         "max": 500,
         "step": 5

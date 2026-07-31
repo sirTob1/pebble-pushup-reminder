@@ -42,7 +42,7 @@ def draw_screen_1(draw, size, is_round):
     draw.text(((w - tw2)/2, header_h + 20), prog_text, fill="black", font=font_numbers)
     
     font_sub = get_font(16)
-    sub_text = "Tagesziel"
+    sub_text = "Minimalziel"
     bbox3 = draw.textbbox((0, 0), sub_text, font=font_sub)
     tw3 = bbox3[2] - bbox3[0]
     draw.text(((w - tw3)/2, header_h + 65 if not is_round else header_h + 80), sub_text, fill=(100,100,100), font=font_sub)

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-07-31
+
+### Added
+- **User-defined Minimum Goal (US-14):** The adaptive algorithm now respects your configured minimum target. Your daily goal will never drop below this baseline during deloads.
+- **Smartwatch Confirmation Dialog (US-14):** When you lower your minimum goal directly on the smartwatch, you will now be prompted whether you want to reset your current adaptive progress to this new minimum, or keep your progress.
+- **Terminology Updates (US-14):** Renamed "Tagesziel (Manuell)" / "Manual Target" to "Minimalziel" / "Minimum Goal" across the UI to clarify its behavior.
+
 ## [1.5.0] - 2026-07-10
 
 ### Added
