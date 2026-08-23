@@ -45,16 +45,18 @@ Die Akzeptanzkriterien müssen klar strukturiert sein und werden unterteilt in:
 ## 4. Git-Workflow & Branching-Modell
 
 * **Feature Branches:** Für jede User Story wird ein eigener Branch erstellt und genutzt (z. B. `feature/US-[ID]-[kurzbeschreibung]`).
-* **Automatisierte Tests:** Vor dem Merge muss so weit wie möglich automatisiert getestet werden (z. B. über automatisierte Test-Suiten oder CI/CD-Pipelines), um sicherzustellen, dass die Anforderungen korrekt und fehlerfrei umgesetzt wurden.
-* **Merge & Abschluss:** Nach erfolgreicher Verifikation wird der Branch gemergt und die User Story im Repository (z. B. GitHub Issues oder GitHub Project) als abgeschlossen markiert/geschlossen.
+* **Commit-Messages (Conventional Commits):** Commits müssen dem Conventional Commits Standard folgen (z. B. `feat: [Beschreibung]`, `fix: [Beschreibung]`, `chore: [Beschreibung]`). Dies sorgt für eine saubere Historie und vereinfacht die Dokumentation.
+* **Verifikation & Manuelle Tests:** Da für Pebble-Entwicklung automatisierte Tests schwer umsetzbar sind, muss jede Änderung vor dem Merge im Pebble-Emulator oder auf physischer Hardware gründlich manuell verifiziert werden.
+* **Merge & Abschluss:** Nach erfolgreicher Verifikation wird der Branch gemergt und die User Story im Repository (GitHub Issues) als abgeschlossen markiert.
 
 ---
 
 ## 5. Dokumentation & Changelog (GitHub als Single Source of Truth)
 
 * **GitHub als führendes System:** Das GitHub-Repository ist immer die führende Quelle für den aktuellen Projektstand.
-* **Aktualität der README.md:** Bei der Implementierung neuer Features muss die `README.md` des Projekts sofort aktualisiert werden, damit sie den aktuellen Stand des Projekts nach außen hin korrekt repräsentiert. Alle neuen Features müssen dort erfasst und verständlich beschrieben sein.
-* **Changelog-Pflicht:** Jede Änderung bzw. jedes neue Feature muss in einer `CHANGELOG.md` dokumentiert werden. Der Changelog listet chronologisch auf, was hinzugefügt, geändert oder behoben wurde (z. B. nach dem Prinzip von *Keep a Changelog*).
+* **Semantic Versioning (SemVer):** Das Projekt folgt Semantic Versioning (`MAJOR.MINOR.PATCH`). Neue Features / User Stories erhöhen die Minor-Version (z. B. `1.4.0` -> `1.5.0`), Bugfixes die Patch-Version (z. B. `1.5.0` -> `1.5.1`).
+* **Aktualität der README.md:** Bei der Implementierung neuer Features muss die `README.md` des Projekts sofort aktualisiert werden, damit sie den aktuellen Stand des Projekts nach außen hin korrekt repräsentiert.
+* **Changelog-Pflicht:** Jede Änderung bzw. jedes neue Feature muss in einer `CHANGELOG.md` dokumentiert werden. Der Changelog listet chronologisch auf, was hinzugefügt, geändert oder behoben wurde (nach dem Prinzip von *Keep a Changelog*).
 
 ---
 
@@ -63,8 +65,8 @@ Die Akzeptanzkriterien müssen klar strukturiert sein und werden unterteilt in:
 Eine User Story gilt erst dann als abgeschlossen ("Done"), wenn alle Punkte dieser Checkliste erfüllt sind:
 
 - [ ] **Akzeptanzkriterien erfüllt:** Alle funktionalen und nicht-funktionalen Akzeptanzkriterien der Story sind erfolgreich umgesetzt.
-- [ ] **Tests erfolgreich:** Automatisierte Tests decken die neue Funktionalität ab und laufen lokal sowie in der CI-Pipeline fehlerfrei durch.
+- [ ] **Verifikation erfolgreich:** Die Funktionalität wurde manuell im Emulator oder auf echter Hardware verifiziert und getestet.
 - [ ] **Dokumentation aktualisiert:** Die `README.md` beschreibt die neuen Features und Änderungen.
-- [ ] **Changelog gepflegt:** Die Änderungen wurden in der `CHANGELOG.md` nachgetragen.
+- [ ] **Changelog gepflegt:** Die Änderungen wurden in der `CHANGELOG.md` unter Beachtung von SemVer nachgetragen.
 - [ ] **Code-Review & Merge:** Der Feature-Branch wurde erfolgreich in den Haupt-Branch gemergt.
 - [ ] **Story geschlossen:** Das Ticket bzw. die User Story im Repository ist geschlossen.

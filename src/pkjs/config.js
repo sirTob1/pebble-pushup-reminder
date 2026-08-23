@@ -74,6 +74,16 @@ module.exports = [
         "min": 0,
         "max": 23,
         "step": 1
+      },
+      {
+        "type": "slider",
+        "messageKey": "AUTO_DISMISS_DURATION",
+        "defaultValue": 20,
+        "label": "Auto-Dismiss Duration (Seconds)",
+        "description": "How long until the reminder closes automatically? (0 = Disabled)",
+        "min": 0,
+        "max": 120,
+        "step": 5
       }
     ]
   },

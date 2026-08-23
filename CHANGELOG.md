@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2026-08-23
+
+### Added
+- **Configurable Auto-Dismiss (US-15):** Reminder notifications on the watch will now automatically dismiss themselves after a configurable duration (default: 20 seconds). You can adjust this duration or disable the feature entirely in the app's settings on your phone.
+
 ## [1.6.0] - 2026-07-31
 
 ### Added

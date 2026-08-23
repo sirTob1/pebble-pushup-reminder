@@ -30,7 +30,8 @@
       "ACTIVE_START_HOUR",
       "ACTIVE_END_HOUR",
       "LOG_PUSHUPS",
-      "LOG_TIMESTAMP"
+      "LOG_TIMESTAMP",
+      "AUTO_DISMISS_DURATION"
     ],
     "resources": {
       "media": []

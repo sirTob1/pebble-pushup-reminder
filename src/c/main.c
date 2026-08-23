@@ -15,12 +15,14 @@
 #define PERSIST_KEY_EFFECTIVE_GOAL    10
 #define PERSIST_KEY_DAY_TYPE          11
 #define PERSIST_KEY_CONSEC_TRAIN_DAYS 12
+#define PERSIST_KEY_AUTO_DISMISS_DURATION 13
 
 // Default values
 #define DEFAULT_DAILY_GOAL        30
 #define DEFAULT_REMINDER_INTERVAL 60
 #define DEFAULT_ACTIVE_START_HOUR 8
 #define DEFAULT_ACTIVE_END_HOUR   20
+#define DEFAULT_AUTO_DISMISS_DURATION 20
 
 // Wakeup cookie
 #define WAKEUP_COOKIE_REMINDER 0
@@ -75,6 +77,8 @@ static uint16_t s_daily_goal        = DEFAULT_DAILY_GOAL;
 static uint16_t s_reminder_interval = DEFAULT_REMINDER_INTERVAL;
 static uint8_t  s_active_start_hour = DEFAULT_ACTIVE_START_HOUR;
 static uint8_t  s_active_end_hour   = DEFAULT_ACTIVE_END_HOUR;
+static int      s_auto_dismiss_duration = DEFAULT_AUTO_DISMISS_DURATION;
+static AppTimer *s_auto_dismiss_timer = NULL;
 
 // Daily tracking state
 static uint16_t s_daily_count = 0;
@@ -159,6 +163,9 @@ static void load_settings(void) {
   }
   if (persist_exists(PERSIST_KEY_ACTIVE_END_HOUR)) {
     s_active_end_hour = (uint8_t)persist_read_int(PERSIST_KEY_ACTIVE_END_HOUR);
+  }
+  if (persist_exists(PERSIST_KEY_AUTO_DISMISS_DURATION)) {
+    s_auto_dismiss_duration = persist_read_int(PERSIST_KEY_AUTO_DISMISS_DURATION);
   }
   if (persist_exists(PERSIST_KEY_LANGUAGE)) {
     s_language = (AppLanguage)persist_read_int(PERSIST_KEY_LANGUAGE);
@@ -584,7 +591,20 @@ static void reminder_layer_update_proc(Layer *layer, GContext *ctx) {
                      GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
 }
 
+static void reminder_dismiss(ClickRecognizerRef recognizer, void *context);
+
+static void auto_dismiss_timer_callback(void *data) {
+  s_auto_dismiss_timer = NULL;
+  reminder_dismiss(NULL, NULL);
+}
+
 static void reminder_dismiss(ClickRecognizerRef recognizer, void *context) {
+  // Clear auto-dismiss timer if it exists
+  if (s_auto_dismiss_timer) {
+    app_timer_cancel(s_auto_dismiss_timer);
+    s_auto_dismiss_timer = NULL;
+  }
+
   // Pop reminder window
   window_stack_pop(true);
 
@@ -638,6 +658,13 @@ static void show_reminder(void) {
     });
   }
   window_stack_push(s_reminder_window, true);
+
+  if (s_auto_dismiss_duration > 0) {
+    if (s_auto_dismiss_timer) {
+      app_timer_cancel(s_auto_dismiss_timer);
+    }
+    s_auto_dismiss_timer = app_timer_register(s_auto_dismiss_duration * 1000, auto_dismiss_timer_callback, NULL);
+  }
 }
 
 // Wakeup handler (called if app is already running when wakeup fires)
@@ -1365,6 +1392,13 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
     s_active_end_hour = end_t->value->uint8;
     persist_write_int(PERSIST_KEY_ACTIVE_END_HOUR, s_active_end_hour);
     if (s_settings_menu_layer) menu_layer_reload_data(s_settings_menu_layer);
+  }
+
+  // Auto-Dismiss Duration
+  Tuple *auto_dismiss_t = dict_find(iter, MESSAGE_KEY_AUTO_DISMISS_DURATION);
+  if (auto_dismiss_t) {
+    s_auto_dismiss_duration = auto_dismiss_t->value->int32;
+    persist_write_int(PERSIST_KEY_AUTO_DISMISS_DURATION, s_auto_dismiss_duration);
   }
 }
 
