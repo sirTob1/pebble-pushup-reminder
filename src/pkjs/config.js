@@ -35,6 +35,13 @@ module.exports = [
         "min": 10,
         "max": 500,
         "step": 5
+      },
+      {
+        "type": "toggle",
+        "messageKey": "STRICT_MODE",
+        "defaultValue": false,
+        "label": "Strict Mode (Prevent Goal Reduction)",
+        "description": "If enabled, your daily goal will never decrease automatically."
       }
     ]
   },

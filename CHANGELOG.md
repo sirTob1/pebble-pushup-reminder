@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-08-23
+
+### Added
+- **Strict Mode (US-16):** Added a new setting "Strict Mode (Prevent Goal Reduction)" to the app's configuration on the phone. When enabled, your daily goal will never automatically decrease (no deloads and no scheduled rest days), ensuring your progression only moves forward.
+
 ## [1.7.0] - 2026-08-23
 
 ### Added

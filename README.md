@@ -5,6 +5,7 @@ Get stronger every day right from your wrist! **Pebble Pushups** is your ultimat
 
 ## 🚀 Features
 - **Adaptive Daily Goals**: The app intelligently learns from your performance while always respecting your configured minimum target! Crush your goals to trigger an 'Overload' day with a higher target, or get a 'Deload/Recovery' day if you need a break. Pushups done on a rest day also count and can trigger an 'Overload'. You can always set a new minimum goal manually!
+- **Strict Mode**: Prevent your daily goal from ever being automatically reduced. For those who want to ensure their progression only moves forward, you can toggle Strict Mode in the settings.
 - **Smart Reminders**: Set your active time window and reminder intervals. Reminders can automatically dismiss themselves after a configurable duration if you can't respond immediately. The app uses the reliable Pebble Wakeup API so it doesn't drain your battery while waiting in the background.
 - **Quick Log**: Easily and reliably log your completed pushups. Supports **Hold-to-Repeat**: hold down the up/down buttons to continuously and quickly increase or decrease the pushup count!
 - **Smartphone Dashboard**: Dive into your workout history! Check out a beautiful 14-day performance chart right inside the Pebble app settings on your phone, and export your data as CSV.

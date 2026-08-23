@@ -1,7 +1,7 @@
 {
   "name": "pebble-pushup-reminder",
   "author": "Antigravity",
-  "version": "1.5.0",
+  "version": "1.8.0",
   "keywords": [
     "pebble-app"
   ],
@@ -10,7 +10,7 @@
     "pebble-clay": "^1.0.4"
   },
   "pebble": {
-    "versionLabel": "1.5.0",
+    "versionLabel": "1.8.0",
     "displayName": "Pushups",
     "uuid": "b91d2938-16e5-472d-88f5-d6023ab945a1",
     "sdkVersion": "3",
@@ -31,7 +31,8 @@
       "ACTIVE_END_HOUR",
       "LOG_PUSHUPS",
       "LOG_TIMESTAMP",
-      "AUTO_DISMISS_DURATION"
+      "AUTO_DISMISS_DURATION",
+      "STRICT_MODE"
     ],
     "resources": {
       "media": []

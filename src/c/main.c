@@ -16,6 +16,7 @@
 #define PERSIST_KEY_DAY_TYPE          11
 #define PERSIST_KEY_CONSEC_TRAIN_DAYS 12
 #define PERSIST_KEY_AUTO_DISMISS_DURATION 13
+#define PERSIST_KEY_STRICT_MODE       14
 
 // Default values
 #define DEFAULT_DAILY_GOAL        30
@@ -78,6 +79,7 @@ static uint16_t s_reminder_interval = DEFAULT_REMINDER_INTERVAL;
 static uint8_t  s_active_start_hour = DEFAULT_ACTIVE_START_HOUR;
 static uint8_t  s_active_end_hour   = DEFAULT_ACTIVE_END_HOUR;
 static int      s_auto_dismiss_duration = DEFAULT_AUTO_DISMISS_DURATION;
+static bool     s_strict_mode       = false;
 static AppTimer *s_auto_dismiss_timer = NULL;
 
 // Daily tracking state
@@ -190,6 +192,9 @@ static void load_settings(void) {
   if (persist_exists(PERSIST_KEY_CONSEC_TRAIN_DAYS)) {
     s_consecutive_train_days = (uint8_t)persist_read_int(PERSIST_KEY_CONSEC_TRAIN_DAYS);
   }
+  if (persist_exists(PERSIST_KEY_STRICT_MODE)) {
+    s_strict_mode = persist_read_bool(PERSIST_KEY_STRICT_MODE);
+  }
   // Load history blob
   if (persist_exists(PERSIST_KEY_HISTORY)) {
     int bytes_read = persist_read_data(PERSIST_KEY_HISTORY, s_history, sizeof(s_history));
@@ -213,6 +218,7 @@ static void save_settings(void) {
   persist_write_int(PERSIST_KEY_EFFECTIVE_GOAL, s_effective_daily_goal);
   persist_write_int(PERSIST_KEY_DAY_TYPE, s_today_day_type);
   persist_write_int(PERSIST_KEY_CONSEC_TRAIN_DAYS, s_consecutive_train_days);
+  persist_write_bool(PERSIST_KEY_STRICT_MODE, s_strict_mode);
   // Save history blob
   persist_write_data(PERSIST_KEY_HISTORY, s_history, s_history_count * sizeof(DayRecord));
 }
@@ -251,7 +257,7 @@ static void run_adaptive_algorithm(void) {
   DayRecord *yesterday = &s_history[s_history_count - 1];
 
   // --- Rule B: Immediate rest day if yesterday had >150% of goal ---
-  if (yesterday->day_type != DAY_TYPE_REST && yesterday->target > 0) {
+  if (!s_strict_mode && yesterday->day_type != DAY_TYPE_REST && yesterday->target > 0) {
     uint32_t fatigue_threshold = (uint32_t)yesterday->target * FATIGUE_EXCESS_PCT / 100;
     if (yesterday->achieved > fatigue_threshold) {
       s_today_day_type = DAY_TYPE_REST;
@@ -264,7 +270,7 @@ static void run_adaptive_algorithm(void) {
   }
 
   // --- Rule A: Rest day after MAX_CONSECUTIVE_TRAIN consecutive training days ---
-  if (s_consecutive_train_days >= MAX_CONSECUTIVE_TRAIN) {
+  if (!s_strict_mode && s_consecutive_train_days >= MAX_CONSECUTIVE_TRAIN) {
     s_today_day_type = DAY_TYPE_REST;
     s_effective_daily_goal = 0;
     s_consecutive_train_days = 0;
@@ -289,7 +295,7 @@ static void run_adaptive_algorithm(void) {
       uint32_t pct = (uint32_t)yesterday->achieved * 100 / base_goal;
       
       // Fatigue check for rest day
-      if (pct > FATIGUE_EXCESS_PCT) {
+      if (!s_strict_mode && pct > FATIGUE_EXCESS_PCT) {
         s_today_day_type = DAY_TYPE_REST;
         s_effective_daily_goal = 0;
         s_consecutive_train_days = 0;
@@ -341,14 +347,21 @@ static void run_adaptive_algorithm(void) {
       APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: OVERLOAD %d -> %d (%d%% achieved)",
               base_goal, s_effective_daily_goal, (int)pct);
     } else if (pct < DELOAD_THRESHOLD_PCT) {
-      // Below 80%: Deload
-      uint16_t decrease = (base_goal * DELOAD_DECREASE_PCT) / 100;
-      if (decrease < 1) decrease = 1;
-      s_effective_daily_goal = base_goal > decrease ? base_goal - decrease : s_daily_goal;
-      if (s_effective_daily_goal < s_daily_goal) s_effective_daily_goal = s_daily_goal;
-      s_today_day_type = DAY_TYPE_TRAINING_DELOAD;
-      APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: DELOAD %d -> %d (%d%% achieved)",
-              base_goal, s_effective_daily_goal, (int)pct);
+      // Below 80%: Deload (unless strict mode is enabled)
+      if (s_strict_mode) {
+        s_effective_daily_goal = base_goal;
+        s_today_day_type = DAY_TYPE_TRAINING_NORMAL;
+        APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: STRICT MODE DELOAD PREVENTED (keep %d, %d%% achieved)",
+                s_effective_daily_goal, (int)pct);
+      } else {
+        uint16_t decrease = (base_goal * DELOAD_DECREASE_PCT) / 100;
+        if (decrease < 1) decrease = 1;
+        s_effective_daily_goal = base_goal > decrease ? base_goal - decrease : s_daily_goal;
+        if (s_effective_daily_goal < s_daily_goal) s_effective_daily_goal = s_daily_goal;
+        s_today_day_type = DAY_TYPE_TRAINING_DELOAD;
+        APP_LOG(APP_LOG_LEVEL_INFO, "Pushups Adaptive: DELOAD %d -> %d (%d%% achieved)",
+                base_goal, s_effective_daily_goal, (int)pct);
+      }
     } else {
       // Between 80-99%: Keep same goal
       s_effective_daily_goal = base_goal;
@@ -1399,6 +1412,13 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   if (auto_dismiss_t) {
     s_auto_dismiss_duration = auto_dismiss_t->value->int32;
     persist_write_int(PERSIST_KEY_AUTO_DISMISS_DURATION, s_auto_dismiss_duration);
+  }
+
+  // Strict Mode
+  Tuple *strict_mode_t = dict_find(iter, MESSAGE_KEY_STRICT_MODE);
+  if (strict_mode_t) {
+    s_strict_mode = strict_mode_t->value->int32 == 1;
+    persist_write_bool(PERSIST_KEY_STRICT_MODE, s_strict_mode);
   }
 }
 
