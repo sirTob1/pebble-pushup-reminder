@@ -375,8 +375,8 @@ static void run_adaptive_algorithm(void) {
   }
 
   // Enforce minimum
-  if (s_effective_daily_goal < MIN_DAILY_GOAL) {
-    s_effective_daily_goal = MIN_DAILY_GOAL;
+  if (s_effective_daily_goal < s_daily_goal) {
+    s_effective_daily_goal = s_daily_goal;
   }
 
   s_consecutive_train_days++;

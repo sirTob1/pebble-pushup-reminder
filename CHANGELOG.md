@@ -2,19 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.8.0] - 2026-08-23
+## [1.6.0] - 2026-08-23
 
 ### Added
 - **Strict Mode (US-16):** Added a new setting "Strict Mode (Prevent Goal Reduction)" to the app's configuration on the phone. When enabled, your daily goal will never automatically decrease (no deloads and no scheduled rest days), ensuring your progression only moves forward.
-
-## [1.7.0] - 2026-08-23
-
-### Added
 - **Configurable Auto-Dismiss (US-15):** Reminder notifications on the watch will now automatically dismiss themselves after a configurable duration (default: 20 seconds). You can adjust this duration or disable the feature entirely in the app's settings on your phone.
-
-## [1.6.0] - 2026-07-31
-
-### Added
 - **User-defined Minimum Goal (US-14):** The adaptive algorithm now respects your configured minimum target. Your daily goal will never drop below this baseline during deloads.
 - **Smartwatch Confirmation Dialog (US-14):** When you lower your minimum goal directly on the smartwatch, you will now be prompted whether you want to reset your current adaptive progress to this new minimum, or keep your progress.
 - **Terminology Updates (US-14):** Renamed "Tagesziel (Manuell)" / "Manual Target" to "Minimalziel" / "Minimum Goal" across the UI to clarify its behavior.
