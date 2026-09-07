@@ -145,7 +145,7 @@ static void schedule_next_wakeup(void);
 static void check_and_reset_daily_count(void);
 static void run_adaptive_algorithm(void);
 
-static void open_quicklog(void);
+static void open_quicklog(bool from_reminder);
 static void open_history(void);
 static void update_app_glance(void);
 
@@ -597,8 +597,8 @@ static void reminder_layer_update_proc(Layer *layer, GContext *ctx) {
                      GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
 
   // Dismiss hint
-  graphics_draw_text(ctx, translate("Beliebige Taste: Schließen",
-                                     "Any button: Dismiss"),
+  graphics_draw_text(ctx, translate("Select: Loggen / Sonst: Schließen",
+                                     "Select: Log / Other: Dismiss"),
                      fonts_get_system_font(FONT_KEY_GOTHIC_14),
                      GRect(4, bounds.size.h - 20, bounds.size.w - 8, 16),
                      GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
@@ -630,10 +630,21 @@ static void reminder_dismiss(ClickRecognizerRef recognizer, void *context) {
   }
 }
 
+static void reminder_select_handler(ClickRecognizerRef recognizer, void *context) {
+  // Clear auto-dismiss timer if it exists
+  if (s_auto_dismiss_timer) {
+    app_timer_cancel(s_auto_dismiss_timer);
+    s_auto_dismiss_timer = NULL;
+  }
+  
+  // Open quicklog
+  open_quicklog(true);
+}
+
 static void reminder_click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_UP, reminder_dismiss);
   window_single_click_subscribe(BUTTON_ID_DOWN, reminder_dismiss);
-  window_single_click_subscribe(BUTTON_ID_SELECT, reminder_dismiss);
+  window_single_click_subscribe(BUTTON_ID_SELECT, reminder_select_handler);
   window_single_click_subscribe(BUTTON_ID_BACK, reminder_dismiss);
 }
 
@@ -963,6 +974,7 @@ static void open_picker(PickerType type, int current, int min, int max, int step
 // Quick Log Window
 // ============================================================================
 static uint16_t s_quicklog_count = 0;
+static bool s_opened_from_reminder = false;
 
 static void quicklog_layer_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
@@ -1049,6 +1061,17 @@ static void quicklog_select_handler(ClickRecognizerRef recognizer, void *context
     
     APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: Quick Log added %d, daily total now %d",
             s_quicklog_count, s_daily_count);
+            
+    if (s_opened_from_reminder) {
+      if (s_launched_by_wakeup) {
+        window_stack_pop_all(true);
+        return;
+      } else {
+        if (s_reminder_window) {
+          window_stack_remove(s_reminder_window, false);
+        }
+      }
+    }
   }
   window_stack_pop(true);
 }
@@ -1080,8 +1103,9 @@ static void quicklog_window_unload(Window *window) {
   s_quicklog_layer = NULL;
 }
 
-static void open_quicklog(void) {
+static void open_quicklog(bool from_reminder) {
   s_quicklog_count = 0;
+  s_opened_from_reminder = from_reminder;
   if (!s_quicklog_window) {
     s_quicklog_window = window_create();
     window_set_window_handlers(s_quicklog_window, (WindowHandlers) {
@@ -1310,7 +1334,7 @@ static void main_menu_select_callback(MenuLayer *menu_layer,
                                        void *data) {
   switch (cell_index->row) {
     case 0:
-      open_quicklog();
+      open_quicklog(false);
       break;
     case 1:
       open_history();
