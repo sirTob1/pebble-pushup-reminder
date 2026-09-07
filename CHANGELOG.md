@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2026-09-07
+
+### Added
+- **Direct Reminder Logging (US-17):** You can now directly open the Quick Log screen straight from a reminder notification by pressing the Select button. This makes logging much faster and avoids having to open the main menu first. The notification hint text has been updated to reflect this change.
+
 ## [1.6.0] - 2026-08-23
 
 ### Added
