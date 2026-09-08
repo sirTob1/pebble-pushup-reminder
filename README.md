@@ -8,7 +8,7 @@ Get stronger every day right from your wrist! **Pebble Pushups** is your ultimat
 - **Strict Mode**: Prevent your daily goal from ever being automatically reduced. For those who want to ensure their progression only moves forward, you can toggle Strict Mode in the settings.
 - **Smart Reminders**: Set your active time window and reminder intervals. Reminders can automatically dismiss themselves after a configurable duration if you can't respond immediately. The app uses the reliable Pebble Wakeup API so it doesn't drain your battery while waiting in the background. You can also log pushups directly from the reminder notification with a single button press.
 - **Quick Log**: Easily and reliably log your completed pushups. Supports **Hold-to-Repeat**: hold down the up/down buttons to continuously and quickly increase or decrease the pushup count!
-- **Smartphone Dashboard**: Dive into your workout history! Check out a beautiful 14-day performance chart right inside the Pebble app settings on your phone, and export your data as CSV.
+- **Smartphone Dashboard**: Dive into your workout history! Check out an interactive 7-day performance chart (powered by Chart.js) right inside the Pebble app settings on your phone, and export your data as CSV.
 - **Offline Sync**: Logged pushups while disconnected from your phone will automatically synchronize the next time you connect!
 - **Fully Offline & Bilingual**: No cloud dependencies! The settings menu (`pebble-clay`) renders completely offline. Available in English and German.
 

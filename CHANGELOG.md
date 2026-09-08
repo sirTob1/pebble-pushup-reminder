@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.0] - 2026-09-08
+
+### Added
+- **Interactive History Chart (US-20):** Replaced the static HTML bar chart in the settings page with a fully interactive Chart.js diagram using an iframe wrapper. This allows for better visualization of your pushup progress over time without conflicting with the Clay UI.
+
 ## [1.8.0] - 2026-09-08
 
 ### Added
