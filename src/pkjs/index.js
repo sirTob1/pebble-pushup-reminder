@@ -45,7 +45,9 @@ var myMessageKeys = {
   "DAILY_GOAL": 10001,
   "REMINDER_INTERVAL": 10002,
   "ACTIVE_START_HOUR": 10003,
-  "ACTIVE_END_HOUR": 10004
+  "ACTIVE_END_HOUR": 10004,
+  "LOG_PUSHUPS": 10005,
+  "LOG_TIMESTAMP": 10006
 };
 
 // Helper to duplicate payload keys (both string and integer) for Gadgetbridge and other runtimes
@@ -76,15 +78,18 @@ Pebble.addEventListener("appmessage", function(e) {
   var dict = e.payload;
   console.log("Pushups JS: Received AppMessage: " + JSON.stringify(dict));
 
-  if (dict.LOG_PUSHUPS !== undefined && dict.LOG_TIMESTAMP !== undefined) {
+  var logPushups = dict.LOG_PUSHUPS !== undefined ? dict.LOG_PUSHUPS : dict["10005"];
+  var logTimestamp = dict.LOG_TIMESTAMP !== undefined ? dict.LOG_TIMESTAMP : dict["10006"];
+
+  if (logPushups !== undefined && logTimestamp !== undefined) {
     var history = [];
     try {
       history = JSON.parse(localStorage.getItem("pushup_history") || "[]");
     } catch (err) {}
     
     history.push({
-      count: dict.LOG_PUSHUPS,
-      time: dict.LOG_TIMESTAMP
+      count: logPushups,
+      time: logTimestamp
     });
     
     localStorage.setItem("pushup_history", JSON.stringify(history));

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.1] - 2026-09-08
+
+### Fixed
+- **Settings Page History (US-18):** Fixed a bug where the Settings Page history would show up as empty due to unsupported key formats from third-party connections like Gadgetbridge.
+
 ## [1.7.0] - 2026-09-07
 
 ### Added
