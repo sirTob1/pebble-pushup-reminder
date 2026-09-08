@@ -32,7 +32,9 @@
       "LOG_PUSHUPS",
       "LOG_TIMESTAMP",
       "AUTO_DISMISS_DURATION",
-      "STRICT_MODE"
+      "STRICT_MODE",
+      "REQUEST_SYNC",
+      "SYNC_OFFLINE_DATA"
     ],
     "resources": {
       "media": []

@@ -480,6 +480,31 @@ static void send_pushup_log(uint16_t count) {
   }
 }
 
+static void send_offline_sync_data(void) {
+  DictionaryIterator *iter;
+  if (app_message_outbox_begin(&iter) == APP_MSG_OK) {
+    uint8_t count = s_history_count + 1;
+    uint8_t data[61];
+    data[0] = count;
+    
+    int offset = 1;
+    for (int i = 0; i < s_history_count; i++) {
+      data[offset++] = s_history[i].achieved & 0xFF;
+      data[offset++] = (s_history[i].achieved >> 8) & 0xFF;
+      data[offset++] = s_history[i].yday & 0xFF;
+      data[offset++] = (s_history[i].yday >> 8) & 0xFF;
+    }
+    // Add today
+    data[offset++] = s_daily_count & 0xFF;
+    data[offset++] = (s_daily_count >> 8) & 0xFF;
+    data[offset++] = s_last_date_yday & 0xFF;
+    data[offset++] = (s_last_date_yday >> 8) & 0xFF;
+
+    dict_write_data(iter, MESSAGE_KEY_SYNC_OFFLINE_DATA, data, offset);
+    app_message_outbox_send();
+  }
+}
+
 // ============================================================================
 // Wakeup Scheduling
 // ============================================================================
@@ -1443,6 +1468,12 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   if (strict_mode_t) {
     s_strict_mode = strict_mode_t->value->int32 == 1;
     persist_write_bool(PERSIST_KEY_STRICT_MODE, s_strict_mode);
+  }
+
+  // Sync Request
+  Tuple *sync_req_t = dict_find(iter, MESSAGE_KEY_REQUEST_SYNC);
+  if (sync_req_t) {
+    send_offline_sync_data();
   }
 }
 

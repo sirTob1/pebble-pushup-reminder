@@ -47,7 +47,9 @@ var myMessageKeys = {
   "ACTIVE_START_HOUR": 10003,
   "ACTIVE_END_HOUR": 10004,
   "LOG_PUSHUPS": 10005,
-  "LOG_TIMESTAMP": 10006
+  "LOG_TIMESTAMP": 10006,
+  "REQUEST_SYNC": 10008,
+  "SYNC_OFFLINE_DATA": 10009
 };
 
 // Helper to duplicate payload keys (both string and integer) for Gadgetbridge and other runtimes
@@ -71,6 +73,10 @@ function prepareMessage(msg) {
 // Ready event
 Pebble.addEventListener("ready", function(e) {
   console.log("Pushups JS: Ready!");
+  var msg = prepareMessage({"REQUEST_SYNC": 1});
+  Pebble.sendAppMessage(msg, function() {
+    console.log("Pushups JS: Requested offline sync.");
+  });
 });
 
 // AppMessage listener (receive data from watch)
@@ -80,6 +86,7 @@ Pebble.addEventListener("appmessage", function(e) {
 
   var logPushups = dict.LOG_PUSHUPS !== undefined ? dict.LOG_PUSHUPS : dict["10005"];
   var logTimestamp = dict.LOG_TIMESTAMP !== undefined ? dict.LOG_TIMESTAMP : dict["10006"];
+  var syncData = dict.SYNC_OFFLINE_DATA !== undefined ? dict.SYNC_OFFLINE_DATA : dict["10009"];
 
   if (logPushups !== undefined && logTimestamp !== undefined) {
     var history = [];
@@ -94,5 +101,57 @@ Pebble.addEventListener("appmessage", function(e) {
     
     localStorage.setItem("pushup_history", JSON.stringify(history));
     console.log("Pushups JS: Saved pushup session to history.");
+  }
+
+  if (syncData !== undefined) {
+    var num_records = syncData[0];
+    var hist = [];
+    try {
+      hist = JSON.parse(localStorage.getItem("pushup_history") || "[]");
+    } catch (err) {}
+
+    function getYearDay(timestamp) {
+      var d = new Date(timestamp * 1000);
+      var start = new Date(d.getFullYear(), 0, 0);
+      var diff = (d - start) + ((start.getTimezoneOffset() - d.getTimezoneOffset()) * 60 * 1000);
+      var oneDay = 1000 * 60 * 60 * 24;
+      return Math.floor(diff / oneDay);
+    }
+    
+    var dailyTotals = {};
+    for (var i = 0; i < hist.length; i++) {
+      var yday = getYearDay(hist[i].time);
+      if (!dailyTotals[yday]) dailyTotals[yday] = 0;
+      dailyTotals[yday] += hist[i].count;
+    }
+
+    var currentYDay = getYearDay(Math.floor(Date.now() / 1000));
+    var currentYear = new Date().getFullYear();
+    var added = false;
+
+    for (var r = 0; r < num_records; r++) {
+      var offset = 1 + r * 4;
+      var achieved = syncData[offset] | (syncData[offset + 1] << 8);
+      var r_yday = syncData[offset + 2] | (syncData[offset + 3] << 8);
+      
+      var existing = dailyTotals[r_yday] || 0;
+      if (achieved > existing) {
+        var missing = achieved - existing;
+        var r_year = (r_yday > currentYDay + 10) ? currentYear - 1 : currentYear;
+        var dummyDate = new Date(r_year, 0, r_yday);
+        dummyDate.setHours(12, 0, 0, 0);
+        
+        hist.push({
+          count: missing,
+          time: Math.floor(dummyDate.getTime() / 1000)
+        });
+        added = true;
+        console.log("Pushups JS: Synced " + missing + " missing pushups for yday " + r_yday);
+      }
+    }
+
+    if (added) {
+      localStorage.setItem("pushup_history", JSON.stringify(hist));
+    }
   }
 });

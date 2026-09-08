@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-09-08
+
+### Added
+- **Offline Sync (US-19):** Pushups logged on the watch while disconnected from the phone will now automatically sync to the phone's dashboard once the connection is restored (e.g. by opening the settings page).
+
 ## [1.7.1] - 2026-09-08
 
 ### Fixed
