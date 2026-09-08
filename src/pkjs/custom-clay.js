@@ -28,29 +28,75 @@ module.exports = function(minified) {
       // Keep last 7 days for the chart
       dates = dates.slice(-7);
 
-      var maxCount = 0;
+      var labels = [];
+      var values = [];
       for (var j = 0; j < dates.length; j++) {
-        if (dailyTotals[dates[j]] > maxCount) maxCount = dailyTotals[dates[j]];
+        var parts = dates[j].split("-");
+        labels.push(parts[2] + "." + parts[1] + ".");
+        values.push(dailyTotals[dates[j]]);
       }
 
-      // Generate HTML chart
-      var html = '<div style="display:flex; align-items:flex-end; height:100px; padding-bottom:10px; border-bottom:1px solid #ccc; margin-bottom:10px; gap:4px;">';
-      
-      for (var k = 0; k < dates.length; k++) {
-        var dt = dates[k];
-        var count = dailyTotals[dt];
-        var heightPct = maxCount > 0 ? (count / maxCount * 100) : 0;
-        html += '<div style="flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center;">';
-        html += '<div style="font-size:10px; color:#555;">' + count + '</div>';
-        html += '<div style="width:100%; height:' + heightPct + 'px; background:#0055AA; min-height:1px;"></div>';
-        var shortDate = dt.split("-")[2] + "." + dt.split("-")[1] + ".";
-        html += '<div style="font-size:9px; color:#888; margin-top:2px;">' + shortDate + '</div>';
-        html += '</div>';
-      }
-      html += '</div>';
-      html += '<p style="font-size:12px; color:#666;">Total Entries: ' + history.length + '</p>';
+      var iframeHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body, html { margin:0; padding:0; background:transparent; overflow:hidden; font-family:sans-serif; }
+  canvas { display:block; width:100%; height:180px; }
+</style>
+</head>
+<body>
+<canvas id="chart"></canvas>
+<script>
+  let chart;
+  window.addEventListener('message', function(e) {
+    if(e.data && e.data.type === 'render') {
+      if(chart) chart.destroy();
+      const ctx = document.getElementById('chart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: e.data.labels,
+          datasets: [{
+            label: 'Pushups',
+            data: e.data.values,
+            backgroundColor: '#FF4700',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    }
+  });
+  window.parent.postMessage('chartReady', '*');
+</script>
+</body>
+</html>`;
+
+      var encodedSrc = "data:text/html;charset=utf-8," + encodeURIComponent(iframeHTML.trim());
+      var html = '<iframe id="chart-iframe" src="' + encodedSrc + '" style="width:100%; height:180px; border:none; margin-bottom:10px;"></iframe>';
+      html += '<p style="font-size:12px; color:#666; text-align:center;">Total Entries: ' + history.length + '</p>';
 
       $('#dashboard-chart').set('innerHTML', html);
+
+      window.addEventListener('message', function(e) {
+        if(e.data === 'chartReady') {
+          var iframe = document.getElementById('chart-iframe');
+          if(iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ type: 'render', labels: labels, values: values }, '*');
+          }
+        }
+      });
 
       // Setup Export CSV
       $('#btn-export-csv').on('click', function(e) {
