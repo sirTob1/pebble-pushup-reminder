@@ -6,6 +6,8 @@ var clay = new Clay(clayConfig, customClay, { autoHandleEvents: false });
 // We must manually handle events to support the Gadgetbridge workarounds
 // but Clay still handles the UI generation.
 Pebble.addEventListener('showConfiguration', function(e) {
+  var historyStr = localStorage.getItem("pushup_history") || "[]";
+  clay.meta.userData = { historyStr: historyStr };
   Pebble.openURL(clay.generateUrl());
 });
 

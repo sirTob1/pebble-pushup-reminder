@@ -25,8 +25,6 @@ module.exports = function(minified) {
         dailyTotals[dateStr] += entry.count;
       }
 
-      var datesAll = Object.keys(dailyTotals);
-
       var currentLabels = [];
       var currentValues = [];
       var activeTimeframe = null;
@@ -43,11 +41,30 @@ module.exports = function(minified) {
         var timeframe = activeTimeframe;
         var viewMode = activeViewMode;
 
-        var dates = datesAll.slice();
+        var dates = [];
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         if (timeframe !== 'all') {
           var limit = parseInt(timeframe, 10);
-          if (dates.length > limit) {
-             dates = dates.slice(-limit);
+          for (var i = limit - 1; i >= 0; i--) {
+            var d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+            var dateStr = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+            dates.push(dateStr);
+          }
+        } else {
+          var firstDate = today;
+          if (history.length > 0) {
+            firstDate = new Date(history[0].time * 1000);
+            firstDate.setHours(0, 0, 0, 0);
+          }
+          var daysDiff = Math.floor((today.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysDiff > 1825) daysDiff = 1825; 
+          if (daysDiff < 0) daysDiff = 0;
+          for (var i = daysDiff; i >= 0; i--) {
+            var d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+            var dateStr = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+            dates.push(dateStr);
           }
         }
 
@@ -56,7 +73,7 @@ module.exports = function(minified) {
         for (var j = 0; j < dates.length; j++) {
           var parts = dates[j].split("-");
           currentLabels.push(parts[2] + "." + parts[1] + ".");
-          currentValues.push(dailyTotals[dates[j]]);
+          currentValues.push(dailyTotals[dates[j]] || 0);
         }
 
         var controlsHTML = '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">' +

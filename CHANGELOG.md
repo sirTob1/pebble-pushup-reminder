@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2026-09-09
+
+### Fixed
+- **History Chart Timeline (US-22):** Fixed a bug in the settings page dashboard where days without pushups were entirely skipped in the timeline. The chart now explicitly displays inactive days (0 pushups) and generates a correct, continuous calendar timeline for "Last 7 Days", "Last 30 Days", and "Last Year" views.
+
 ## [2.0.0] - 2026-09-09
 
 ### Added
