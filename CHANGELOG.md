@@ -2,17 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.9.0] - 2026-09-08
+## [1.10.0] - 2026-09-09
 
 ### Added
-- **Interactive History Chart (US-20):** Replaced the static HTML bar chart in the settings page with a fully interactive Chart.js diagram using an iframe wrapper. This allows for better visualization of your pushup progress over time without conflicting with the Clay UI.
+- **Extended History Dashboard (US-21):** The history dashboard in the settings page now allows you to change the timeframe (7 Days, 30 Days, 1 Year, All Time) and toggle between the Bar Chart and a Data Table view. Your preferences are saved automatically.
+
+## [1.9.0] - 2026-09-09
+
+### Fixed
+- **Settings Page History Dashboard:** Fixed an issue where the history dashboard on the settings page would display "No history available yet." despite existing records. This was caused by the Webview (Clay UI) not having access to the watchapp's internal local storage. Data is now injected into the Webview upon loading.
 
 ## [1.8.0] - 2026-09-08
 
 ### Added
+- **Interactive History Chart (US-20):** Replaced the static HTML bar chart in the settings page with a fully interactive Chart.js diagram using an iframe wrapper. This allows for better visualization of your pushup progress over time without conflicting with the Clay UI.
 - **Offline Sync (US-19):** Pushups logged on the watch while disconnected from the phone will now automatically sync to the phone's dashboard once the connection is restored (e.g. by opening the settings page).
-
-## [1.7.1] - 2026-09-08
 
 ### Fixed
 - **Settings Page History (US-18):** Fixed a bug where the Settings Page history would show up as empty due to unsupported key formats from third-party connections like Gadgetbridge.
