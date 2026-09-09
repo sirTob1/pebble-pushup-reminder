@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.10.0] - 2026-09-09
+## [2.0.0] - 2026-09-09
 
 ### Added
 - **Extended History Dashboard (US-21):** The history dashboard in the settings page now allows you to change the timeframe (7 Days, 30 Days, 1 Year, All Time) and toggle between the Bar Chart and a Data Table view. Your preferences are saved automatically.
