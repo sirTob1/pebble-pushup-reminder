@@ -29,14 +29,19 @@ module.exports = function(minified) {
 
       var currentLabels = [];
       var currentValues = [];
+      var activeTimeframe = null;
+      var activeViewMode = null;
 
       function renderDashboard() {
-        var timeframe = '7';
-        var viewMode = 'chart';
-        try {
-          timeframe = localStorage.getItem('dashboard_timeframe') || '7';
-          viewMode = localStorage.getItem('dashboard_view') || 'chart';
-        } catch(e) {}
+        if (activeTimeframe === null) {
+          try { activeTimeframe = localStorage.getItem('dashboard_timeframe') || '7'; } catch(e) { activeTimeframe = '7'; }
+        }
+        if (activeViewMode === null) {
+          try { activeViewMode = localStorage.getItem('dashboard_view') || 'chart'; } catch(e) { activeViewMode = 'chart'; }
+        }
+
+        var timeframe = activeTimeframe;
+        var viewMode = activeViewMode;
 
         var dates = datesAll.slice();
         if (timeframe !== 'all') {
@@ -140,14 +145,16 @@ module.exports = function(minified) {
         var tfSelect = document.getElementById('timeframe-select');
         if (tfSelect) {
           tfSelect.addEventListener('change', function(e) {
-            try { localStorage.setItem('dashboard_timeframe', e.target.value); } catch(err) {}
+            activeTimeframe = e.target.value;
+            try { localStorage.setItem('dashboard_timeframe', activeTimeframe); } catch(err) {}
             renderDashboard();
           });
         }
         var vwSelect = document.getElementById('view-select');
         if (vwSelect) {
           vwSelect.addEventListener('change', function(e) {
-            try { localStorage.setItem('dashboard_view', e.target.value); } catch(err) {}
+            activeViewMode = e.target.value;
+            try { localStorage.setItem('dashboard_view', activeViewMode); } catch(err) {}
             renderDashboard();
           });
         }
