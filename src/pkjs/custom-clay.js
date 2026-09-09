@@ -27,13 +27,16 @@ module.exports = function(minified) {
 
       var datesAll = Object.keys(dailyTotals);
 
-      // We need these accessible to the message listener
       var currentLabels = [];
       var currentValues = [];
 
       function renderDashboard() {
-        var timeframe = localStorage.getItem('dashboard_timeframe') || '7';
-        var viewMode = localStorage.getItem('dashboard_view') || 'chart';
+        var timeframe = '7';
+        var viewMode = 'chart';
+        try {
+          timeframe = localStorage.getItem('dashboard_timeframe') || '7';
+          viewMode = localStorage.getItem('dashboard_view') || 'chart';
+        } catch(e) {}
 
         var dates = datesAll.slice();
         if (timeframe !== 'all') {
@@ -134,21 +137,22 @@ module.exports = function(minified) {
 
         $('#dashboard-chart').set('innerHTML', controlsHTML + contentHTML + summaryHTML);
 
-        document.getElementById('timeframe-select').addEventListener('change', function(e) {
-          localStorage.setItem('dashboard_timeframe', e.target.value);
-          renderDashboard();
-        });
-        document.getElementById('view-select').addEventListener('change', function(e) {
-          localStorage.setItem('dashboard_view', e.target.value);
-          renderDashboard();
-        });
-        
-        // If view is table, we don't need to postMessage.
-        // If chart, postMessage will be triggered when iframe replies 'chartReady'.
-        // However, if the iframe is already ready (fast reload), it might miss it. The chartReady approach usually handles this.
+        var tfSelect = document.getElementById('timeframe-select');
+        if (tfSelect) {
+          tfSelect.addEventListener('change', function(e) {
+            try { localStorage.setItem('dashboard_timeframe', e.target.value); } catch(err) {}
+            renderDashboard();
+          });
+        }
+        var vwSelect = document.getElementById('view-select');
+        if (vwSelect) {
+          vwSelect.addEventListener('change', function(e) {
+            try { localStorage.setItem('dashboard_view', e.target.value); } catch(err) {}
+            renderDashboard();
+          });
+        }
       }
 
-      // We only register the message listener once globally for this page
       if (!window.__dashboardMessageListenerAdded) {
         window.addEventListener('message', function(e) {
           if(e.data === 'chartReady') {
@@ -183,6 +187,9 @@ module.exports = function(minified) {
       });
 
     } catch (e) {
+      try {
+        $('#dashboard-chart').set('innerHTML', '<div style="color:red; font-size:12px;">Error: ' + e.message + '</div>');
+      } catch(e2) {}
       console.log("Error rendering dashboard: " + e);
     }
   });
