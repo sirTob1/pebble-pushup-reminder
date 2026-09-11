@@ -1,7 +1,7 @@
 {
   "name": "pebble-pushup-reminder",
   "author": "Antigravity",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "keywords": [
     "pebble-app"
   ],
@@ -10,7 +10,7 @@
     "pebble-clay": "^1.0.4"
   },
   "pebble": {
-    "versionLabel": "2.1.1",
+    "versionLabel": "2.2",
     "displayName": "Pushups",
     "uuid": "b91d2938-16e5-472d-88f5-d6023ab945a1",
     "sdkVersion": "3",
