@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.1] - 2026-09-11
+
+### Fixed
+- **Settings Page CSV Export (US-23):** Fixed an issue where the "Export CSV" button produced no response. Due to file download restrictions in mobile WebViews, clicking the button now displays the CSV data directly within the page so it can be easily copied to the clipboard. An option to send the data via email (`mailto:`) has also been added.
+
 ## [2.1.0] - 2026-09-09
 
 ### Fixed
