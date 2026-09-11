@@ -219,8 +219,7 @@ module.exports = function(minified) {
         var exportHTML = '<div style="margin-bottom:10px;">' +
           '<p style="font-size:14px; font-weight:bold; margin-top:0;">CSV Export (Copy Text below)</p>' +
           '<textarea id="csv-export-area" style="width:100%; height:180px; font-family:monospace; font-size:12px; padding:5px; box-sizing:border-box;">' + rawCsvContent + '</textarea>' +
-          '<div style="display:flex; justify-content:space-between; margin-top:10px;">' +
-            '<a href="mailto:?subject=Pushups%20Export&body=' + encodeURIComponent(rawCsvContent) + '" style="font-size:14px; text-decoration:none; color:#FF4700; padding:5px 0;">&#9993; Send via Email</a>' +
+          '<div style="display:flex; justify-content:flex-end; margin-top:10px;">' +
             '<button class="btn" id="btn-close-export" style="padding:4px 15px; font-size:14px; background-color:#aaa; border:none; border-radius:4px; color:#fff;">Close</button>' +
           '</div>' +
         '</div>';
