@@ -7,11 +7,20 @@ module.exports = function(minified) {
   clayConfig.on(clayConfig.EVENTS.AFTER_BUILD, function() {
     var historyStr = clayConfig.meta.userData && clayConfig.meta.userData.historyStr;
     if (!historyStr) historyStr = localStorage.getItem("pushup_history");
-    if (!historyStr || historyStr === "[]") return;
+
+    if (!historyStr || historyStr === "[]") {
+      var btn = document.getElementById('btn-export-csv');
+      if (btn) btn.style.display = 'none';
+      return;
+    }
 
     try {
       var history = JSON.parse(historyStr);
-      if (!history || history.length === 0) return;
+      if (!history || history.length === 0) {
+        var btn = document.getElementById('btn-export-csv');
+        if (btn) btn.style.display = 'none';
+        return;
+      }
 
       // Group by date (YYYY-MM-DD) for charting
       var dailyTotals = {};
@@ -194,20 +203,44 @@ module.exports = function(minified) {
       // Setup Export CSV
       $('#btn-export-csv').on('click', function(e) {
         e.preventDefault();
-        var csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += "Date,Timestamp,Pushups\n";
+        
+        var rawCsvContent = "Date,Timestamp,Pushups\n";
         for (var n = 0; n < history.length; n++) {
           var row = history[n];
           var rd = new Date(row.time * 1000);
-          csvContent += rd.toISOString() + "," + row.time + "," + row.count + "\n";
+          rawCsvContent += rd.toISOString() + "," + row.time + "," + row.count + "\n";
         }
-        var encodedUri = encodeURI(csvContent);
-        var link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "pushups_history.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        
+        // Hide the export button
+        var exportBtn = document.getElementById('btn-export-csv');
+        if (exportBtn) exportBtn.style.display = 'none';
+        
+        // Replace dashboard chart with textarea
+        var exportHTML = '<div style="margin-bottom:10px;">' +
+          '<p style="font-size:14px; font-weight:bold; margin-top:0;">CSV Export (Copy Text below)</p>' +
+          '<textarea id="csv-export-area" style="width:100%; height:180px; font-family:monospace; font-size:12px; padding:5px; box-sizing:border-box;">' + rawCsvContent + '</textarea>' +
+          '<div style="display:flex; justify-content:space-between; margin-top:10px;">' +
+            '<a href="mailto:?subject=Pushups%20Export&body=' + encodeURIComponent(rawCsvContent) + '" style="font-size:14px; text-decoration:none; color:#FF4700; padding:5px 0;">&#9993; Send via Email</a>' +
+            '<button class="btn" id="btn-close-export" style="padding:4px 15px; font-size:14px; background-color:#aaa; border:none; border-radius:4px; color:#fff;">Close</button>' +
+          '</div>' +
+        '</div>';
+        
+        $('#dashboard-chart').set('innerHTML', exportHTML);
+        
+        // Auto-select text in textarea
+        var textArea = document.getElementById('csv-export-area');
+        if (textArea) {
+          textArea.focus();
+          textArea.select();
+          try { textArea.setSelectionRange(0, 99999); } catch(err) {}
+        }
+        
+        // Handle close button
+        $('#btn-close-export').on('click', function(ev) {
+          ev.preventDefault();
+          if (exportBtn) exportBtn.style.display = 'block';
+          renderDashboard();
+        });
       });
 
     } catch (e) {
