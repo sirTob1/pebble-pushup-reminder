@@ -1,0 +1,9 @@
+feat(reminders): implement snooze function
+
+- Adds snooze_until persistent state to schedule_next_wakeup.
+- Maps UP button in reminder window to new Snooze Menu.
+- Adds permanent "Snooze" / "Cancel Snooze" option to main menu.
+- Bumps version to 2.3.0 / 2.3 in package.json.
+- Updates CHANGELOG.md and README.md.
+
+Closes #31

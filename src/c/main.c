@@ -17,6 +17,7 @@
 #define PERSIST_KEY_CONSEC_TRAIN_DAYS 12
 #define PERSIST_KEY_AUTO_DISMISS_DURATION 13
 #define PERSIST_KEY_STRICT_MODE       14
+#define PERSIST_KEY_SNOOZE_UNTIL      15
 
 // Default values
 #define DEFAULT_DAILY_GOAL        30
@@ -81,6 +82,7 @@ static uint8_t  s_active_end_hour   = DEFAULT_ACTIVE_END_HOUR;
 static int      s_auto_dismiss_duration = DEFAULT_AUTO_DISMISS_DURATION;
 static bool     s_strict_mode       = false;
 static AppTimer *s_auto_dismiss_timer = NULL;
+static time_t   s_snooze_until      = 0;
 
 // Daily tracking state
 static uint16_t s_daily_count = 0;
@@ -195,6 +197,9 @@ static void load_settings(void) {
   if (persist_exists(PERSIST_KEY_STRICT_MODE)) {
     s_strict_mode = persist_read_bool(PERSIST_KEY_STRICT_MODE);
   }
+  if (persist_exists(PERSIST_KEY_SNOOZE_UNTIL)) {
+    s_snooze_until = (time_t)persist_read_int(PERSIST_KEY_SNOOZE_UNTIL);
+  }
   // Load history blob
   if (persist_exists(PERSIST_KEY_HISTORY)) {
     int bytes_read = persist_read_data(PERSIST_KEY_HISTORY, s_history, sizeof(s_history));
@@ -219,6 +224,11 @@ static void save_settings(void) {
   persist_write_int(PERSIST_KEY_DAY_TYPE, s_today_day_type);
   persist_write_int(PERSIST_KEY_CONSEC_TRAIN_DAYS, s_consecutive_train_days);
   persist_write_bool(PERSIST_KEY_STRICT_MODE, s_strict_mode);
+  if (s_snooze_until > 0) {
+    persist_write_int(PERSIST_KEY_SNOOZE_UNTIL, (int)s_snooze_until);
+  } else {
+    persist_delete(PERSIST_KEY_SNOOZE_UNTIL);
+  }
   // Save history blob
   persist_write_data(PERSIST_KEY_HISTORY, s_history, s_history_count * sizeof(DayRecord));
 }
@@ -529,40 +539,51 @@ static void schedule_next_wakeup(void) {
   }
 
   time_t now = time(NULL);
-  struct tm *t = localtime(&now);
-  int current_hour = t->tm_hour;
   time_t wakeup_time;
 
-  if (schedule_for_tomorrow) {
-    struct tm tomorrow = *t;
-    tomorrow.tm_mday += 1;
-    tomorrow.tm_hour = s_active_start_hour;
-    tomorrow.tm_min = 0;
-    tomorrow.tm_sec = 0;
-    wakeup_time = mktime(&tomorrow);
+  if (s_snooze_until > now) {
+    wakeup_time = s_snooze_until;
+    APP_LOG(APP_LOG_LEVEL_INFO, "Pushups: Snooze active, scheduling wakeup at snooze time.");
   } else {
-    // Calculate next wakeup time
-    wakeup_time = now + (s_reminder_interval * 60);
-    struct tm *wt = localtime(&wakeup_time);
-    int wakeup_hour = wt->tm_hour;
+    if (s_snooze_until != 0) {
+      s_snooze_until = 0;
+      persist_delete(PERSIST_KEY_SNOOZE_UNTIL);
+    }
 
-    // If the wakeup would be outside the active window, schedule for the start of the next active window
-    if (wakeup_hour < s_active_start_hour || wakeup_hour >= s_active_end_hour) {
-      // If we're before the start hour today, schedule for today's start
-      if (current_hour < s_active_start_hour) {
-        struct tm tomorrow = *t;
-        tomorrow.tm_hour = s_active_start_hour;
-        tomorrow.tm_min = 0;
-        tomorrow.tm_sec = 0;
-        wakeup_time = mktime(&tomorrow);
-      } else {
-        // Schedule for tomorrow's start hour
-        struct tm tomorrow = *t;
-        tomorrow.tm_mday += 1;
-        tomorrow.tm_hour = s_active_start_hour;
-        tomorrow.tm_min = 0;
-        tomorrow.tm_sec = 0;
-        wakeup_time = mktime(&tomorrow);
+    struct tm *t = localtime(&now);
+    int current_hour = t->tm_hour;
+
+    if (schedule_for_tomorrow) {
+      struct tm tomorrow = *t;
+      tomorrow.tm_mday += 1;
+      tomorrow.tm_hour = s_active_start_hour;
+      tomorrow.tm_min = 0;
+      tomorrow.tm_sec = 0;
+      wakeup_time = mktime(&tomorrow);
+    } else {
+      // Calculate next wakeup time
+      wakeup_time = now + (s_reminder_interval * 60);
+      struct tm *wt = localtime(&wakeup_time);
+      int wakeup_hour = wt->tm_hour;
+
+      // If the wakeup would be outside the active window, schedule for the start of the next active window
+      if (wakeup_hour < s_active_start_hour || wakeup_hour >= s_active_end_hour) {
+        // If we're before the start hour today, schedule for today's start
+        if (current_hour < s_active_start_hour) {
+          struct tm tomorrow = *t;
+          tomorrow.tm_hour = s_active_start_hour;
+          tomorrow.tm_min = 0;
+          tomorrow.tm_sec = 0;
+          wakeup_time = mktime(&tomorrow);
+        } else {
+          // Schedule for tomorrow's start hour
+          struct tm tomorrow = *t;
+          tomorrow.tm_mday += 1;
+          tomorrow.tm_hour = s_active_start_hour;
+          tomorrow.tm_min = 0;
+          tomorrow.tm_sec = 0;
+          wakeup_time = mktime(&tomorrow);
+        }
       }
     }
   }
@@ -622,8 +643,8 @@ static void reminder_layer_update_proc(Layer *layer, GContext *ctx) {
                      GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
 
   // Dismiss hint
-  graphics_draw_text(ctx, translate("Select: Loggen / Sonst: Schließen",
-                                     "Select: Log / Other: Dismiss"),
+  graphics_draw_text(ctx, translate("Sel: Log / Up: Snooze / Zurück: Weg",
+                                     "Sel: Log / Up: Snooze / Back: Dismiss"),
                      fonts_get_system_font(FONT_KEY_GOTHIC_14),
                      GRect(4, bounds.size.h - 20, bounds.size.w - 8, 16),
                      GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
@@ -666,8 +687,20 @@ static void reminder_select_handler(ClickRecognizerRef recognizer, void *context
   open_quicklog(true);
 }
 
+static void open_snooze_menu(void);
+
+static void reminder_up_handler(ClickRecognizerRef recognizer, void *context) {
+  // Clear auto-dismiss timer if it exists
+  if (s_auto_dismiss_timer) {
+    app_timer_cancel(s_auto_dismiss_timer);
+    s_auto_dismiss_timer = NULL;
+  }
+  
+  open_snooze_menu();
+}
+
 static void reminder_click_config_provider(void *context) {
-  window_single_click_subscribe(BUTTON_ID_UP, reminder_dismiss);
+  window_single_click_subscribe(BUTTON_ID_UP, reminder_up_handler);
   window_single_click_subscribe(BUTTON_ID_DOWN, reminder_dismiss);
   window_single_click_subscribe(BUTTON_ID_SELECT, reminder_select_handler);
   window_single_click_subscribe(BUTTON_ID_BACK, reminder_dismiss);
@@ -1302,9 +1335,103 @@ static void settings_menu_window_unload(Window *window) {
 }
 
 // ============================================================================
+// Snooze Menu Window
+// ============================================================================
+static Window *s_snooze_menu_window = NULL;
+static MenuLayer *s_snooze_menu_layer = NULL;
+
+static uint16_t snooze_menu_get_num_rows(MenuLayer *menu_layer, uint16_t section_index, void *data) {
+  return 4;
+}
+
+static void snooze_menu_draw_row(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *data) {
+  switch (cell_index->row) {
+    case 0:
+      menu_cell_basic_draw(ctx, cell_layer, "1 Hour", NULL, NULL);
+      break;
+    case 1:
+      menu_cell_basic_draw(ctx, cell_layer, "4 Hours", NULL, NULL);
+      break;
+    case 2:
+      menu_cell_basic_draw(ctx, cell_layer, "8 Hours", NULL, NULL);
+      break;
+    case 3:
+      menu_cell_basic_draw(ctx, cell_layer, "Until Tomorrow", NULL, NULL);
+      break;
+  }
+}
+
+static void snooze_menu_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *data) {
+  time_t now = time(NULL);
+  
+  switch (cell_index->row) {
+    case 0: s_snooze_until = now + 3600; break;
+    case 1: s_snooze_until = now + 14400; break;
+    case 2: s_snooze_until = now + 28800; break;
+    case 3: {
+      struct tm *t = localtime(&now);
+      struct tm tomorrow = *t;
+      tomorrow.tm_mday += 1;
+      tomorrow.tm_hour = s_active_start_hour;
+      tomorrow.tm_min = 0;
+      tomorrow.tm_sec = 0;
+      s_snooze_until = mktime(&tomorrow);
+      break;
+    }
+  }
+  
+  save_settings();
+  schedule_next_wakeup();
+  
+  // Close snooze menu
+  window_stack_pop(true);
+  
+  // If reminder window is open, close it too
+  if (s_reminder_window && window_stack_contains_window(s_reminder_window)) {
+    window_stack_remove(s_reminder_window, false);
+  }
+}
+
+static void snooze_menu_window_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+
+  s_snooze_menu_layer = menu_layer_create(bounds);
+  menu_layer_set_callbacks(s_snooze_menu_layer, NULL, (MenuLayerCallbacks) {
+    .get_num_rows = snooze_menu_get_num_rows,
+    .draw_row = snooze_menu_draw_row,
+    .select_click = snooze_menu_select_callback,
+  });
+  menu_layer_set_click_config_onto_window(s_snooze_menu_layer, window);
+  
+  #if defined(PBL_COLOR)
+    menu_layer_set_normal_colors(s_snooze_menu_layer, GColorWhite, GColorBlack);
+    menu_layer_set_highlight_colors(s_snooze_menu_layer, GColorCobaltBlue, GColorWhite);
+  #endif
+
+  layer_add_child(window_layer, menu_layer_get_layer(s_snooze_menu_layer));
+}
+
+static void snooze_menu_window_unload(Window *window) {
+  menu_layer_destroy(s_snooze_menu_layer);
+  s_snooze_menu_layer = NULL;
+}
+
+static void open_snooze_menu(void) {
+  if (!s_snooze_menu_window) {
+    s_snooze_menu_window = window_create();
+    window_set_window_handlers(s_snooze_menu_window, (WindowHandlers) {
+      .load = snooze_menu_window_load,
+      .unload = snooze_menu_window_unload
+    });
+  }
+  window_stack_push(s_snooze_menu_window, true);
+}
+
+// ============================================================================
 // Main Menu Window
 // ============================================================================
-#define MAIN_MENU_NUM_ROWS 3
+#define MAIN_MENU_NUM_ROWS 4
 
 static uint16_t main_menu_get_num_rows(MenuLayer *menu_layer,
                                         uint16_t section_index,
@@ -1351,6 +1478,17 @@ static void main_menu_draw_row(GContext *ctx, const Layer *cell_layer,
                            translate("Einstellungen", "Settings"),
                            translate("Ziel, Timer, Zeitfenster", "Goal, Timer, Window"), NULL);
       break;
+    case 3:
+      if (s_snooze_until > time(NULL)) {
+        menu_cell_basic_draw(ctx, cell_layer, 
+                             translate("Snooze beenden", "Cancel Snooze"), 
+                             translate("Erinnerungen fortsetzen", "Resume reminders"), NULL);
+      } else {
+        menu_cell_basic_draw(ctx, cell_layer, 
+                             "Snooze", 
+                             translate("Erinnerungen pausieren", "Pause reminders"), NULL);
+      }
+      break;
   }
 }
 
@@ -1374,6 +1512,16 @@ static void main_menu_select_callback(MenuLayer *menu_layer,
         });
       }
       window_stack_push(s_settings_menu_window, true);
+      break;
+    case 3:
+      if (s_snooze_until > time(NULL)) {
+        s_snooze_until = 0;
+        persist_delete(PERSIST_KEY_SNOOZE_UNTIL);
+        schedule_next_wakeup();
+        menu_layer_reload_data(menu_layer);
+      } else {
+        open_snooze_menu();
+      }
       break;
   }
 }

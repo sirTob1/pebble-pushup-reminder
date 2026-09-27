@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3] - 2026-09-27
+
+### Added
+- **Snooze Function (US-24):** You can now snooze reminder notifications for 1 hour, 4 hours, 8 hours, or until the next day by pressing the Up button directly on the reminder screen. The main menu also features a new Snooze option to let you manually pause or resume your reminders at any time.
+
 ## [2.2] - 2026-09-11
 
 ### Fixed
