@@ -11,6 +11,7 @@ Get stronger every day right from your wrist! **Pebble Pushups** is your ultimat
 - **Smartphone Dashboard**: Dive into your workout history! Check out an interactive 7-day performance chart (powered by Chart.js) right inside the Pebble app settings on your phone, and export your data as CSV.
 - **Offline Sync**: Logged pushups while disconnected from your phone will automatically synchronize the next time you connect!
 - **Fully Offline & Bilingual**: No cloud dependencies! The settings menu (`pebble-clay`) renders completely offline. Available in English and German.
+- **Native Watch Launcher Integration**: Includes a custom high-contrast menu icon in the Pebble app drawer across `basalt`, `chalk`, and `emery` smartwatches.
 
 ## 🛠️ Build Instructions
 Since the official Pebble SDK is no longer actively maintained natively for modern OS, we use a Docker container to build the app safely.
