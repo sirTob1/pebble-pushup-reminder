@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5] - 2026-10-24
+
+### Added
+- **Watch App Drawer Menu Icon (US-26):** Added a dedicated 25×25 px pushup icon (`IMAGE_MENU_ICON`) so the app is now visually represented in the Pebble system launcher across all platforms (`basalt`, `chalk`, `emery`).
+
 ## [2.4] - 2026-10-24
 
 ### Fixed
