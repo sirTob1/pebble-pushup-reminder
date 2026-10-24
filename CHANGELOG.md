@@ -2,12 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.5] - 2026-10-24
+## [2.4] - 2026-10-24
 
 ### Added
 - **Watch App Drawer Menu Icon (US-26):** Added a dedicated 25×25 px pushup icon (`IMAGE_MENU_ICON`) so the app is now visually represented in the Pebble system launcher across all platforms (`basalt`, `chalk`, `emery`).
-
-## [2.4] - 2026-10-24
 
 ### Fixed
 - **Strict Mode Persistence & Goal Reduction (US-25):** Fixed a bug where disabling "Strict Mode" in the settings page was overridden on every app start due to a message key collision between `REQUEST_SYNC` and `STRICT_MODE` in the phone-to-watch communication layer. The daily goal now properly reduces (deloads) and schedules rest days when Strict Mode is disabled.
