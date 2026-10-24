@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4] - 2026-10-24
+
+### Fixed
+- **Strict Mode Persistence & Goal Reduction (US-25):** Fixed a bug where disabling "Strict Mode" in the settings page was overridden on every app start due to a message key collision between `REQUEST_SYNC` and `STRICT_MODE` in the phone-to-watch communication layer. The daily goal now properly reduces (deloads) and schedules rest days when Strict Mode is disabled.
+
 ## [2.3] - 2026-09-27
 
 ### Added

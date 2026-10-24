@@ -50,8 +50,10 @@ var myMessageKeys = {
   "ACTIVE_END_HOUR": 10004,
   "LOG_PUSHUPS": 10005,
   "LOG_TIMESTAMP": 10006,
-  "REQUEST_SYNC": 10008,
-  "SYNC_OFFLINE_DATA": 10009
+  "AUTO_DISMISS_DURATION": 10007,
+  "STRICT_MODE": 10008,
+  "REQUEST_SYNC": 10009,
+  "SYNC_OFFLINE_DATA": 10010
 };
 
 // Helper to duplicate payload keys (both string and integer) for Gadgetbridge and other runtimes
@@ -75,7 +77,14 @@ function prepareMessage(msg) {
 // Ready event
 Pebble.addEventListener("ready", function(e) {
   console.log("Pushups JS: Ready!");
-  var msg = prepareMessage({"REQUEST_SYNC": 1});
+  var syncPayload = {"REQUEST_SYNC": 1};
+  try {
+    var savedSettings = JSON.parse(localStorage.getItem("clay-settings") || "{}");
+    if (typeof savedSettings.STRICT_MODE === "boolean") {
+      syncPayload.STRICT_MODE = savedSettings.STRICT_MODE ? 1 : 0;
+    }
+  } catch (err) {}
+  var msg = prepareMessage(syncPayload);
   Pebble.sendAppMessage(msg, function() {
     console.log("Pushups JS: Requested offline sync.");
   });
@@ -88,7 +97,7 @@ Pebble.addEventListener("appmessage", function(e) {
 
   var logPushups = dict.LOG_PUSHUPS !== undefined ? dict.LOG_PUSHUPS : dict["10005"];
   var logTimestamp = dict.LOG_TIMESTAMP !== undefined ? dict.LOG_TIMESTAMP : dict["10006"];
-  var syncData = dict.SYNC_OFFLINE_DATA !== undefined ? dict.SYNC_OFFLINE_DATA : dict["10009"];
+  var syncData = dict.SYNC_OFFLINE_DATA !== undefined ? dict.SYNC_OFFLINE_DATA : dict["10010"];
 
   if (logPushups !== undefined && logTimestamp !== undefined) {
     var history = [];
