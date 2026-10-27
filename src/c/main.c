@@ -1295,7 +1295,7 @@ static void settings_menu_select_callback(MenuLayer *menu_layer,
                                            void *data) {
   switch (cell_index->row) {
     case 0:
-      open_picker(PICKER_DAILY_GOAL, s_daily_goal, 1, 500, 5);
+      open_picker(PICKER_DAILY_GOAL, s_daily_goal, 5, 500, 5);
       break;
     case 1:
       open_picker(PICKER_REMINDER_INTERVAL, s_reminder_interval, 15, 240, 15);
@@ -1347,16 +1347,16 @@ static uint16_t snooze_menu_get_num_rows(MenuLayer *menu_layer, uint16_t section
 static void snooze_menu_draw_row(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *data) {
   switch (cell_index->row) {
     case 0:
-      menu_cell_basic_draw(ctx, cell_layer, "1 Hour", NULL, NULL);
+      menu_cell_basic_draw(ctx, cell_layer, translate("1 Stunde", "1 Hour"), NULL, NULL);
       break;
     case 1:
-      menu_cell_basic_draw(ctx, cell_layer, "4 Hours", NULL, NULL);
+      menu_cell_basic_draw(ctx, cell_layer, translate("4 Stunden", "4 Hours"), NULL, NULL);
       break;
     case 2:
-      menu_cell_basic_draw(ctx, cell_layer, "8 Hours", NULL, NULL);
+      menu_cell_basic_draw(ctx, cell_layer, translate("8 Stunden", "8 Hours"), NULL, NULL);
       break;
     case 3:
-      menu_cell_basic_draw(ctx, cell_layer, "Until Tomorrow", NULL, NULL);
+      menu_cell_basic_draw(ctx, cell_layer, translate("Bis morgen", "Until Tomorrow"), NULL, NULL);
       break;
   }
 }
@@ -1715,6 +1715,9 @@ static void deinit(void) {
   }
   if (s_confirm_window) {
     window_destroy(s_confirm_window);
+  }
+  if (s_snooze_menu_window) {
+    window_destroy(s_snooze_menu_window);
   }
   window_destroy(s_main_menu_window);
 }

@@ -9,5 +9,5 @@ Bitte vor dem Mergen sicherstellen, dass alle Punkte erfüllt sind:
 - [ ] **Akzeptanzkriterien erfüllt:** Alle funktionalen und nicht-funktionalen Akzeptanzkriterien der User Story sind umgesetzt.
 - [ ] **Verifikation erfolgreich:** Die Funktionalität wurde im Pebble-Emulator oder auf echter Hardware verifiziert.
 - [ ] **Dokumentation aktualisiert:** Die [README.md](README.md) wurde an den neuen Projektstand angepasst.
-- [ ] **Changelog gepflegt:** Die Änderungen wurden in [CHANGELOG.md](CHANGELOG.md) dokumentiert (SemVer beachtet).
+- [ ] **Changelog gepflegt:** Die Änderungen wurden in [CHANGELOG.md](CHANGELOG.md) dokumentiert (`MAJOR.MINOR` Pebble-Versionierung beachtet).
 - [ ] **GitHub Issue geschlossen:** Das entsprechende Issue/die User Story ist verlinkt (z. B. `Closes #15`).

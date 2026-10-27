@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5] - 2026-10-27
+
+### Changed
+- **Consistent Minimum Goal Range (US-27):** Aligned the minimum selectable daily goal to `5` pushups (in steps of 5 up to 500) across both the watch settings picker and the smartphone configuration page.
+- **Repository & Documentation Cleanup (US-27):** Removed obsolete temporary files and one-off scripts from the project root, moved asset generator scripts to `scripts/`, untracked `.lock-waf_linux2_build`, and updated `README.md` and `coding_guidelines.md` to match the current feature set and `<major>.<minor>` Pebble versioning convention.
+
+### Fixed
+- **Snooze Menu Localization (US-27):** Localized all Snooze duration options on the watch (`1 Stunde` / `1 Hour`, `4 Stunden` / `4 Hours`, `8 Stunden` / `8 Hours`, `Bis morgen` / `Until Tomorrow`) so they respect the selected app language.
+- **Snooze Window Memory Cleanup (US-27):** Added missing `window_destroy(s_snooze_menu_window)` in `deinit()` on watchapp exit.
+- **Docker Build Script Resources (US-27):** Fixed `docker_build.sh` to copy the `resources/` directory into the build container so `IMAGE_MENU_ICON` is included reliably during builds.
+
 ## [2.4] - 2026-10-24
 
 ### Added
@@ -61,7 +72,7 @@ All notable changes to this project will be documented in this file.
 ## [1.5.0] - 2026-07-10
 
 ### Added
-- **Rest Day Performance Tracking (US-15):** Pushups logged on a rest day now count! If you meet or exceed the target of your last training day on a rest day, it triggers progressive overload. If you do fewer pushups, there is no penalty (no deload), respecting your rest day.
+- **Rest Day Performance Tracking (US-13):** Pushups logged on a rest day now count! If you meet or exceed the target of your last training day on a rest day, it triggers progressive overload. If you do fewer pushups, there is no penalty (no deload), respecting your rest day.
 
 ## [1.4.0] - 2026-06-28
 
