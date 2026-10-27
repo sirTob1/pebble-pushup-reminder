@@ -1,6 +1,7 @@
 # Build directories
 build/
 bin/
+.lock-waf*
 
 # Node/npm (if using RockyJS or modern tooling)
 node_modules/

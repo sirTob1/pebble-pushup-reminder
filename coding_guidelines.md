@@ -54,7 +54,7 @@ Die Akzeptanzkriterien müssen klar strukturiert sein und werden unterteilt in:
 ## 5. Dokumentation & Changelog (GitHub als Single Source of Truth)
 
 * **GitHub als führendes System:** Das GitHub-Repository ist immer die führende Quelle für den aktuellen Projektstand.
-* **Semantic Versioning (SemVer):** Das Projekt folgt Semantic Versioning (`MAJOR.MINOR.PATCH`). Neue Features / User Stories erhöhen die Minor-Version (z. B. `1.4.0` -> `1.5.0`), Bugfixes die Patch-Version (z. B. `1.5.0` -> `1.5.1`).
+* **Pebble Versioning (`MAJOR.MINOR`):** Da Pebble-Apps nur zweistellige Versionsnummern unterstützen (`<major>.<minor>`, z. B. `2.5`), wird auf eine dritte Patch-Stelle verzichtet. Jedes neue Release erhöht die Minor-Version (z. B. `2.4` -> `2.5`).
 * **Aktualität der README.md:** Bei der Implementierung neuer Features muss die `README.md` des Projekts sofort aktualisiert werden, damit sie den aktuellen Stand des Projekts nach außen hin korrekt repräsentiert.
 * **Changelog-Pflicht:** Jede Änderung bzw. jedes neue Feature muss in einer `CHANGELOG.md` dokumentiert werden. Der Changelog listet chronologisch auf, was hinzugefügt, geändert oder behoben wurde (nach dem Prinzip von *Keep a Changelog*).
 
@@ -67,6 +67,6 @@ Eine User Story gilt erst dann als abgeschlossen ("Done"), wenn alle Punkte dies
 - [ ] **Akzeptanzkriterien erfüllt:** Alle funktionalen und nicht-funktionalen Akzeptanzkriterien der Story sind erfolgreich umgesetzt.
 - [ ] **Verifikation erfolgreich:** Die Funktionalität wurde manuell im Emulator oder auf echter Hardware verifiziert und getestet.
 - [ ] **Dokumentation aktualisiert:** Die `README.md` beschreibt die neuen Features und Änderungen.
-- [ ] **Changelog gepflegt:** Die Änderungen wurden in der `CHANGELOG.md` unter Beachtung von SemVer nachgetragen.
+- [ ] **Changelog gepflegt:** Die Änderungen wurden in der `CHANGELOG.md` unter Beachtung des Pebble-Versionierungsschemas (`MAJOR.MINOR`) nachgetragen.
 - [ ] **Code-Review & Merge:** Der Feature-Branch wurde erfolgreich in den Haupt-Branch gemergt.
 - [ ] **Story geschlossen:** Das Ticket bzw. die User Story im Repository ist geschlossen.

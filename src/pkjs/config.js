@@ -32,7 +32,7 @@ module.exports = [
         "defaultValue": 30,
         "label": "Minimum Goal / Minimalziel",
         "description": "The absolute minimum pushup target per day.",
-        "min": 10,
+        "min": 5,
         "max": 500,
         "step": 5
       },

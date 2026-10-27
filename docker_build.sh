@@ -6,6 +6,8 @@ echo "Copying files to container root..."
 rm -rf /root/project
 mkdir -p /root/project
 cp -r /app/src /root/project/
+cp -r /app/resources /root/project/
+cp -r /app/node_modules /root/project/ || true
 cp /app/package.json /root/project/
 cp /app/wscript /root/project/
 
@@ -32,6 +34,7 @@ pebble build
 echo "Build succeeded! Copying final PBW, JS, and header files back to host..."
 mkdir -p /app/build
 cp /root/project/build/*.pbw /app/build/
+cp /root/project/build/project.pbw /app/build/app.pbw || true
 cp /root/project/build/pebble-js-app.js /app/build/ || true
 cp /root/project/build/include/message_keys.auto.h /app/build/ || true
 cp /root/project/build/js/message_keys.json /app/build/ || true
